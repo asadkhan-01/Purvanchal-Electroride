@@ -8,11 +8,14 @@ import java.time.OffsetDateTime;
 public class Booking {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
-    @Column(name = "enquiry_id", nullable = false) public Long enquiryId;
+    @Column(name = "enquiry_id") public Long enquiryId;
     @Column(name = "vehicle_id", nullable = false) public Long vehicleId;
     @Column(nullable = false) public String branch;
+    @Column(name = "customer_name", nullable = false) public String customerName;
+    @Column(name = "customer_phone", nullable = false) public String customerPhone;
+    @Column(nullable = false) public String salesperson;
     @Column(nullable = false) public String status = "PENDING";
-    @Column(name = "prior_enquiry_stage", nullable = false) public String priorEnquiryStage;
+    @Column(name = "prior_enquiry_stage") public String priorEnquiryStage;
     @Column(name = "created_by", nullable = false) public String createdBy;
     @Column(name = "confirmed_by") public String confirmedBy;
     @Column(name = "cancelled_by") public String cancelledBy;
