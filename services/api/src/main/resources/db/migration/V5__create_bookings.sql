@@ -4,6 +4,7 @@ CREATE TABLE bookings (
     vehicle_id BIGINT NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT,
     branch VARCHAR(100) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    prior_enquiry_stage VARCHAR(30) NOT NULL,
     created_by VARCHAR(80) NOT NULL,
     confirmed_by VARCHAR(80),
     cancelled_by VARCHAR(80),
