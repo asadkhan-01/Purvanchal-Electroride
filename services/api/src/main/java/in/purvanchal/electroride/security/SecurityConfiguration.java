@@ -41,6 +41,7 @@ public class SecurityConfiguration {
             // Basic auth is DEVELOPMENT ONLY; requests carry explicit Authorization headers.
             // Replace it with a production-grade session/token design and CSRF controls before release.
             .csrf(csrf -> csrf.disable())
+            .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
