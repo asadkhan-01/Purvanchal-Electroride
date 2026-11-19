@@ -1,3 +1,4 @@
+import AdminUsers from './AdminUsers';
 import LiveBookings from './LiveBookings';
 import SessionGate from './SessionGate';
 import { CurrentUser, clearLoginCredentials, setUnauthorizedHandler } from './api/enquiries';
@@ -13,7 +14,7 @@ import {
   TextInput, View, useWindowDimensions,
 } from 'react-native';
 
-type Section = 'Overview' | 'Enquiries' | 'Inventory' | 'Sales' | 'Finance';
+type Section = 'Overview' | 'Enquiries' | 'Inventory' | 'Sales' | 'Finance' | 'Users';
 const sections: Section[] = ['Overview', 'Enquiries', 'Inventory', 'Sales', 'Finance'];
 const colors = {
   navy: '#102A35', teal: '#087D72', mint: '#DDF4ED',
@@ -52,6 +53,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const { width } = useWindowDimensions();
   const wide = width >= 850;
+  const visibleSections = session?.role === 'ADMIN' ? [...sections, 'Users' as Section] : sections;
   const shownEnquiries = enquiries.filter(e => (e.name + e.detail + e.status).toLowerCase().includes(search.toLowerCase()));
   return (
     <SafeAreaView style={styles.root}>
@@ -62,7 +64,7 @@ export default function App() {
           <Text style={styles.sidebarBrand}>PURVANCHAL{'\n'}ELECTRORIDE</Text>
           <Text style={styles.sidebarCaption}>DEALERSHIP ERP</Text>
           <View style={{ height: 34 }} />
-          {sections.map(item => <Pressable key={item} onPress={() => setSection(item)} style={[styles.sideLink, section === item && styles.sideLinkActive]}>
+          {visibleSections.map(item => <Pressable key={item} onPress={() => setSection(item)} style={[styles.sideLink, section === item && styles.sideLinkActive]}>
             <Text style={[styles.sideLinkText, section === item && { color: colors.white }]}>{item}</Text>
           </Pressable>)}
           <View style={{ flex: 1 }} />
@@ -109,12 +111,13 @@ export default function App() {
             {section === 'Enquiries' && (apiConfigured && session ? <LiveCRM user={session} onStartBooking={id => { setBookingEnquiryId(id); setSection('Sales'); }} /> : <CRM />)}
             {section === 'Inventory' && (apiConfigured && session ? <LiveInventory user={session} /> : <Inventory />)}
             {section === 'Sales' && (apiConfigured && session ? <LiveBookings user={session} enquiryId={bookingEnquiryId} onClearEnquiry={() => setBookingEnquiryId(null)} /> : <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings and allocations are available when the API is configured. Invoices and deliveries are planned.</Text></View>)}
+            {section === 'Users' && session?.role === 'ADMIN' && apiConfigured && <AdminUsers />}
             {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
             </>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
           </ScrollView>
-          {!wide && <View style={styles.bottomNav}>{sections.map(item => <Pressable key={item} onPress={() => setSection(item)} style={styles.bottomItem}>
-            <Text style={[styles.bottomGlyph, section === item && { color: colors.teal }]}>{item === 'Overview' ? '⌂' : item === 'Enquiries' ? '◎' : item === 'Inventory' ? '▣' : item === 'Sales' ? '↗' : '₹'}</Text>
+          {!wide && <View style={[styles.bottomNav, { flexWrap: 'wrap' }]}>{visibleSections.map(item => <Pressable key={item} onPress={() => setSection(item)} style={[styles.bottomItem, { minWidth: session?.role === 'ADMIN' ? '16%' : '19%' }]}>
+            <Text style={[styles.bottomGlyph, section === item && { color: colors.teal }]}>{item === 'Overview' ? '⌂' : item === 'Enquiries' ? '◎' : item === 'Inventory' ? '▣' : item === 'Sales' ? '↗' : item === 'Users' ? '♙' : '₹'}</Text>
             <Text style={[styles.bottomText, section === item && { color: colors.teal, fontWeight: '700' }]}>{item === 'Overview' ? 'Home' : item}</Text>
           </Pressable>)}</View>}
         </View>
