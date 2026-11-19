@@ -1,3 +1,4 @@
+import Inventory from './Inventory';
 import CRM from './CRM';
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
@@ -90,13 +91,7 @@ export default function App() {
                 <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
             </>}
             {section === 'Enquiries' && <CRM />}
-            {section === 'Inventory' && <>
-              <Text style={styles.intro}>Chassis-level vehicle tracking across branches</Text>
-              {inventory.map(v => <View key={v.id} style={styles.vehicleCard}>
-                <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{v.name}</Text><Text style={styles.rowSub}>{v.id} · {v.branch}</Text></View>
-                <Text style={[styles.status, { color: v.status === 'Available' ? colors.teal : colors.amber }]}>{v.status}</Text>
-              </View>)}
-            </>}
+            {section === 'Inventory' && <Inventory />}
             {section === 'Sales' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings, vehicle allocation, tax invoices and deliveries will appear here. Demo snapshot: 24 vehicles delivered this month.</Text></View>}
             {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
