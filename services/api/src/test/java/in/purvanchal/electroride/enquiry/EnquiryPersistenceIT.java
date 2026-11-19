@@ -65,6 +65,30 @@ class EnquiryPersistenceIT {
                     """))
                 .build(), HttpResponse.BodyHandlers.ofString());
         assertThat(changed.statusCode()).isEqualTo(200);
+        HttpResponse<String> activityResponse = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/activities"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""
+                    {"message":"Called to confirm interest"}
+                    """))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(activityResponse.statusCode()).isEqualTo(201);
+        assertThat(activityResponse.body()).contains("Called to confirm interest");
+
+        HttpResponse<String> followUpResponse = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/follow-up"))
+                .header("Content-Type", "application/json")
+                .method("PATCH", HttpRequest.BodyPublishers.ofString("""
+                    {"followUpDate":"2026-12-05"}
+                    """))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(followUpResponse.statusCode()).isEqualTo(200);
+        assertThat(followUpResponse.body()).contains("2026-12-05");
+
+        ResponseEntity<String> history = rest.getForEntity("/api/v1/enquiries/" + id + "/activities", String.class);
+        assertThat(history.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(history.getBody()).contains("Called to confirm interest", "Stage changed to Interested",
+            "Follow-up scheduled for 2026-12-05");
         Enquiry updated = rest.getForObject("/api/v1/enquiries/" + id, Enquiry.class);
         assertThat(updated.stage).isEqualTo("Interested");
 
