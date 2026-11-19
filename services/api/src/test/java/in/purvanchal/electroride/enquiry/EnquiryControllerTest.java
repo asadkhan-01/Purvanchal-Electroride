@@ -36,7 +36,7 @@ class EnquiryControllerTest {
         reset(repository, activities, access);
         AppUser admin = new AppUser();
         admin.role = "ADMIN";
-        when(access.current(any())).thenReturn(admin);
+        when(access.current(nullable(org.springframework.security.core.Authentication.class))).thenReturn(admin);
     }
 
     private Enquiry sample(long id) {
