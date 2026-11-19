@@ -1,3 +1,4 @@
+import LiveInventory from './LiveInventory';
 import LiveCRM from './LiveCRM';
 import { apiConfigured } from './api/enquiries';
 import Inventory from './Inventory';
@@ -66,7 +67,7 @@ export default function App() {
             <View style={styles.avatar}><Text style={styles.avatarText}>AD</Text></View>
           </View>
           <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard metrics and inventory are sample data. CRM uses the API only when configured.</Text></View>
+            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard, sales and finance are sample data. CRM and Inventory use the API only when configured.</Text></View>
             {section === 'Overview' && <>
               <View style={[styles.hero, wide && { flexDirection: 'row', alignItems: 'center' }]}>
                 <View style={{ flex: 1 }}>
@@ -93,7 +94,7 @@ export default function App() {
                 <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
             </>}
             {section === 'Enquiries' && (apiConfigured ? <LiveCRM /> : <CRM />)}
-            {section === 'Inventory' && <Inventory />}
+            {section === 'Inventory' && (apiConfigured ? <LiveInventory /> : <Inventory />)}
             {section === 'Sales' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings, vehicle allocation, tax invoices and deliveries will appear here. Demo snapshot: 24 vehicles delivered this month.</Text></View>}
             {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
