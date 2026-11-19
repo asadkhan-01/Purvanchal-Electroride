@@ -2,16 +2,16 @@
 
 A multi-branch electric-vehicle dealership management system for new EVs, targeting approximately 3–5 branches.
 
-> **Development status:** The Expo dashboard, enquiry CRM and vehicle inventory interfaces exist. The Spring Boot API supports PostgreSQL-backed enquiries and chassis-level inventory, with development-only database-backed authentication and branch-scoped access. Enquiries and Inventory use persistent APIs when configured; sales and finance remain demo screens. **No real customer or financial data should be used yet.**
+> **Development status:** The Expo dashboard, enquiry CRM and vehicle inventory interfaces exist. The Spring Boot API supports PostgreSQL-backed enquiries, chassis-level inventory and booking allocations, with development-only database-backed authentication and branch-scoped access. Enquiries and Inventory use persistent APIs when configured; the Sales & Bookings API is implemented but its Expo screen and Finance remain demo placeholders. **No real customer or financial data should be used yet.**
 
 ## Architecture
 
 | Layer | Technology | Status |
 |---|---|---|
 | Mobile and web preview | Expo SDK 58, React Native, TypeScript | Dashboard and opt-in API-backed CRM and inventory |
-| API | Java 21, Spring Boot 3.5 | CRM and vehicle inventory endpoints |
-| Database | PostgreSQL 16 + Flyway | Enquiries, activities, users, vehicles and movements |
-| Integration tests | JUnit 5, Spring Boot Test, Testcontainers | CRM, security and inventory lifecycle tests |
+| API | Java 21, Spring Boot 3.5 | CRM, inventory and bookings endpoints |
+| Database | PostgreSQL 16 + Flyway | Enquiries, activities, users, vehicles, movements and bookings |
+| Integration tests | JUnit 5, Spring Boot Test, Testcontainers | CRM, security, inventory and booking lifecycle tests |
 | CI | GitHub Actions | Backend unit/integration checks and Expo TypeScript checks |
 | Web admin | React/TypeScript | Planned |
 | Development authentication | Spring Security, BCrypt and database-backed users | Implemented; not production-ready |
@@ -66,7 +66,7 @@ Open the forwarded **8081** port in Codespaces. The web preview works in demo mo
 
 The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** with one app-wide sign-in screen for CRM and Inventory. The account's role and branch are obtained once from `/api/v1/auth/me`, retained in React state while the app is running, and passed to both modules. Credentials are held in memory only; sign-out or an HTTP 401 clears them and returns the app to sign-in. A page reload also requires signing in again. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
 
-See **[API setup, endpoint details and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
+The booking API has also been added, but the Sales screen is not connected to it yet. See **[API setup, booking endpoints, and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
 
 ## Automated tests
 
@@ -103,8 +103,10 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 7. **Backend CI verified — Inventory backend:** persistent chassis and component serials, reservation, branch transfer, receipt, movement history and server-side branch enforcement.
 8. **Implemented, new CI verification pending — Inventory UI integration:** API-connected inventory with role-aware controls and automated frontend rule tests; demo fallback remains.
 9. **Implemented, CI pending — Shared development login:** a single Expo sign-in, shared role/branch identity, centralized logout and automatic reset on HTTP 401; mobile unit tests cover credential handling.
-10. **Next — Sales and booking foundation:** persistent booking records, inventory allocation and controlled cancellation, followed by finance, accounting, GST and production hardening.
+10. **Implemented, CI verification pending — Sales & Bookings backend:** link enquiry to chassis, prevent duplicate live allocations, confirm pending bookings, cancel with a reason, restore stock, record lifecycle events, and test against PostgreSQL.
+11. **Next — Sales & Bookings Expo integration:** build the authenticated booking screen with eligible enquiries and available vehicles.
+12. **Later —** quotes, payments, invoices, delivery, GST, accounting, finance reconciliation and production hardening.
 
 ## Safety and compliance
 
-This is development software, not a production ERP. The backend now enforces role-based CRM permissions and requires development credentials. The standalone demo screens are still simulations, and the application does not yet have production-ready authentication or administrative audit controls. Financial and GST rules, subsidy treatment, backup processes, privacy protection and operational procedures require implementation, testing and review before production use.
+This is development software, not a production ERP. The backend enforces role-based CRM, inventory and booking permissions and requires development credentials. The standalone demo screens are still simulations, and the application does not yet have production-ready authentication or administrative audit controls. Financial and GST rules, subsidy treatment, backup processes, privacy protection and operational procedures require implementation, testing and review before production use.
