@@ -1,11 +1,11 @@
 import SessionGate from './SessionGate';
-import { CurrentUser, clearLoginCredentials } from './api/enquiries';
+import { CurrentUser, clearLoginCredentials, setUnauthorizedHandler } from './api/enquiries';
 import LiveInventory from './LiveInventory';
 import LiveCRM from './LiveCRM';
 import { apiConfigured } from './api/enquiries';
 import Inventory from './Inventory';
 import CRM from './CRM';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   Pressable, SafeAreaView, ScrollView, StyleSheet, Text,
@@ -42,6 +42,10 @@ export default function App() {
   const [section, setSection] = useState<Section>('Overview');
   const [session, setSession] = useState<CurrentUser | null>(null);
   const logout = () => { clearLoginCredentials(); setSession(null); setSection('Overview'); };
+  useEffect(() => {
+    setUnauthorizedHandler(() => { setSession(null); setSection('Overview'); });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const [search, setSearch] = useState('');
   const { width } = useWindowDimensions();
