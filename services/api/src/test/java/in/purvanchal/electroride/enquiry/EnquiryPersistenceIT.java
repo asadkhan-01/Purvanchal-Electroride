@@ -1,6 +1,7 @@
 package in.purvanchal.electroride.enquiry;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -10,6 +11,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.springframework.http.*;
+import in.purvanchal.electroride.security.AppUser;
+import in.purvanchal.electroride.security.AppUserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -35,7 +41,27 @@ class EnquiryPersistenceIT {
     }
 
     @Autowired TestRestTemplate rest;
+    @Autowired AppUserRepository users;
+    @Autowired PasswordEncoder encoder;
     @LocalServerPort int port;
+
+    @BeforeEach
+    void authenticate() {
+        if (users.findByUsername("integration-admin").isEmpty()) {
+            AppUser user = new AppUser();
+            user.username = "integration-admin";
+            user.passwordHash = encoder.encode("integration-secret-123");
+            user.role = "ADMIN";
+            user.displayName = "Integration Administrator";
+            users.save(user);
+        }
+        rest = rest.withBasicAuth("integration-admin", "integration-secret-123");
+    }
+
+    private String basicAuth() {
+        return "Basic " + Base64.getEncoder().encodeToString(
+            "integration-admin:integration-secret-123".getBytes(StandardCharsets.UTF_8));
+    }
 
     @Test
     void createReadUpdateAndListArePersisted() throws Exception {
@@ -60,6 +86,7 @@ class EnquiryPersistenceIT {
         HttpResponse<String> changed = HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/stage"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", basicAuth())
                 .method("PATCH", HttpRequest.BodyPublishers.ofString("""
                     {"stage":"Interested"}
                     """))
