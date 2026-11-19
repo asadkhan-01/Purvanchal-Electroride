@@ -26,6 +26,7 @@ Database migrations run automatically at startup:
 - `V4__create_inventory.sql` — chassis-level vehicles, component serial constraints and movement events
 - `V5__create_bookings.sql` — bookings, partial unique constraints for live allocations and booking events
 - `V6__support_direct_bookings.sql` — optional enquiry linkage and customer/assigned-salesperson snapshots for both booking paths
+- `V7__create_booking_quotations.sql` — immutable tax-exclusive booking quotation snapshots and manager approval
 
 ## Authentication and permissions
 
@@ -128,6 +129,33 @@ Two concurrent bookings cannot allocate the same chassis; database partial uniqu
 
 **Not yet supported:** customer master/deduplication, quotation/prices, booking payment and refund, sale/delivery, invoice/GST, booking expiry, and production authentication. Use test customer data only.
 
+## Quotation & pricing — milestone 12
+
+Each pending booking can have **one immutable draft quotation**, optionally approved by the branch manager or administrator. The Expo Sales booking detail now provides fields to save and review quotations and an **Approve quotation** action for managers.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | /api/v1/bookings/{id}/quotation | Read an authorized booking's quotation |
+| POST | /api/v1/bookings/{id}/quotation | Save one draft quotation for a pending booking |
+| POST | /api/v1/bookings/{id}/quotation/approve | Manager/admin approval of the draft |
+
+Example `POST /api/v1/bookings/123/quotation`:
+
+```json
+{
+  "vehiclePrice": 105000.25,
+  "discount": 5000.10,
+  "accessories": 2250.25,
+  "otherCharges": 750.00
+}
+```
+
+The server computes `subtotalExcludingTax = vehiclePrice - discount + accessories + otherCharges` using Java `BigDecimal`, without floating-point rounding or more than two decimal places. Vehicle price must be positive; discount cannot exceed price; all other amounts must be nonnegative; resulting subtotal must be positive. All fields are mandatory, with zero values permitted where appropriate. The database independently checks amount constraints and subtotal arithmetic.
+
+Only users authorized to see the booking can see the quotation. A salesperson can draft a quotation on an accessible pending booking; only a manager of its branch or an administrator can approve it. The quotation stores creator, approver, approval timestamp and booking events. Replacing, editing or re-approving the saved quotation returns a conflict; quotation revisioning is a later milestone.
+
+**Important limitation:** The amounts are **internal, tax-exclusive indicative figures**, not a final customer payable price, tax calculation, official quotation document or GST invoice. GST, RTO registration, insurance, road tax, subsidies, financing costs, refunds and customer payments are NOT computed. Quotation approval is not currently a prerequisite to confirming a booking: existing booking workflows remain backward-compatible. Never use these figures as a legally compliant invoice or for real customer collection.
+
 ## Automated tests
 
 ```bash
@@ -136,7 +164,7 @@ mvn test          # Controller unit/web-slice tests with mocked repositories
 mvn verify        # Unit tests + PostgreSQL Testcontainers integration tests
 ```
 
-The `BookingControllerTest`, `BookingServiceTest` and `BookingPersistenceIT` cover linked and direct booking creation, validation, state transitions, duplicate allocations, cancellation release, role/branch security and PostgreSQL persistence. The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
+The `QuotationMathTest`, `BookingQuotationControllerTest` and quotation portion of `BookingPersistenceIT` cover exact arithmetic, amount validation, PostgreSQL persistence, duplicate prevention, authorization and manager approval. The `BookingControllerTest`, `BookingServiceTest` and `BookingPersistenceIT` cover linked and direct booking creation, validation, state transitions, duplicate allocations, cancellation release, role/branch security and PostgreSQL persistence. The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
 
 An optional **read-only** smoke test checks an already-running API:
 
