@@ -82,4 +82,40 @@ class BookingControllerTest {
             .content("{\"reason\":\"Customer withdrew\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
     }
+    @Test
+    void createsDirectBookingWithoutEnquiry() throws Exception {
+        Booking booking = new Booking();
+        booking.id = 19L;
+        booking.enquiryId = null;
+        booking.customerName = "Walk-in Customer";
+        booking.customerPhone = "9876500000";
+        booking.status = "PENDING";
+        when(service.createDirect(eq("CHS-200"), eq("Walk-in Customer"), eq("9876500000"), any()))
+            .thenReturn(booking);
+        mvc.perform(post("/api/v1/bookings").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"chassis\":\"CHS-200\",\"customerName\":\"Walk-in Customer\",\"customerPhone\":\"9876500000\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.enquiryId").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.customerName").value("Walk-in Customer"));
+    }
+
+    @Test
+    void rejectsMixedEnquiryAndDirectDetails() throws Exception {
+        mvc.perform(post("/api/v1/bookings").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"enquiryId\":1,\"chassis\":\"CHS-200\",\"customerName\":\"Customer\"}"))
+            .andExpect(status().isBadRequest());
+        verify(service, never()).create(anyLong(), anyString(), any());
+        verify(service, never()).createDirect(anyString(), any(), any(), any());
+    }
+
+    @Test
+    void rejectsDirectBookingWithInvalidPhone() throws Exception {
+        when(service.createDirect(eq("CHS-200"), eq("Customer"), eq("123"), any()))
+            .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "Valid customer name and 10-digit phone required"));
+        mvc.perform(post("/api/v1/bookings").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"chassis\":\"CHS-200\",\"customerName\":\"Customer\",\"customerPhone\":\"123\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
 }
