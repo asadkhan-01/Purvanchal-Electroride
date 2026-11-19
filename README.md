@@ -12,7 +12,7 @@ A multi-branch electric-vehicle dealership management system for new EVs, target
 | API | Java 21, Spring Boot 3.5 | CRM endpoints |
 | Database | PostgreSQL 16 + Flyway | Enquiries and activities |
 | Integration tests | JUnit 5, Spring Boot Test, Testcontainers | CRM lifecycle tests |
-| CI | GitHub Actions | Backend unit/integration checks |
+| CI | GitHub Actions | Backend unit/integration checks and Expo TypeScript checks |
 | Web admin | React/TypeScript | Planned |
 | Production auth | Spring Security | Not yet implemented |
 
@@ -76,7 +76,7 @@ mvn test      # Controller tests
 mvn verify    # Controller + isolated PostgreSQL integration tests
 ```
 
-GitHub Actions runs the backend tests when backend files change or the workflow is updated. The tests must pass before treating new backend functionality as verified.
+GitHub Actions runs the backend tests when backend files change and also typechecks the Expo app when mobile files change. These checks must pass before treating new functionality as verified.
 
 ## Development milestones
 
