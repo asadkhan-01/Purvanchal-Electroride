@@ -62,6 +62,10 @@ npx expo start --web --host localhost
 
 Open the forwarded **8081** port in Codespaces. The web preview works in demo mode without backend configuration.
 
+### Test logins and role management
+
+When `EXPO_PUBLIC_API_URL` is configured, the app shows a shared sign-in screen for all modules. The backend already supports three roles: `ADMIN` (all branches), `BRANCH_MANAGER` (assigned branch) and `SALESPERSON` (own assigned enquiries and bookings). Log in with the initial development admin account to access the new **Users** tab (web sidebar or mobile bottom navigation), where you can list accounts and create additional test administrators, branch managers or salespeople. Branch is required for non-admin accounts. Then sign out and log in under each role to test the restrictions. Passwords are never embedded in source code; use only synthetic account data. See the backend README for the one-time administrator bootstrap instructions.
+
 ### Optional API-backed CRM and Inventory
 
 The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** with one app-wide sign-in screen for CRM and Inventory. The account's role and branch are obtained once from `/api/v1/auth/me`, retained in React state while the app is running, and passed to both modules. Credentials are held in memory only; sign-out or an HTTP 401 clears them and returns the app to sign-in. A page reload also requires signing in again. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
@@ -106,7 +110,8 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 10. **Implemented — Sales & Bookings foundation:** booking allocation, confirmation, cancellation, audit events and PostgreSQL uniqueness protection.
 11. **Implemented, new CI verification pending — Direct and enquiry-linked bookings:** Flyway V6 migration, direct customer capture without a dummy enquiry, CRM → Sales handoff, authenticated Sales UI, and unit/PostgreSQL tests.
 12. **Implemented, CI verification pending — Quotation and pricing foundation:** immutable quotation per pending booking, exact decimal calculations, manager approval, audit events, PostgreSQL V7 and UI integration. Figures exclude taxes and are NOT final customer prices.
-13. **Next —** price lists, quotation revisions, applicable tax/fee modeling and approved final payable totals; then payment receipts, invoices, delivery, GST, accounting, finance reconciliation and production hardening.
+13. **Implemented, CI pending — Admin user management UI:** create and list test users for the three supported roles from an authenticated Admin-only screen; existing app-wide login remains shared.
+14. **Next —** price lists, quotation revisions, applicable tax/fee modeling and approved final payable totals; then payment receipts, invoices, delivery, GST, accounting, finance reconciliation and production hardening.
 
 ## Safety and compliance
 
