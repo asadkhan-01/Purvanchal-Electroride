@@ -29,7 +29,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
   const [movements, setMovements] = useState<VehicleMovement[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<NewVehicle>(blank);
+  const [draft, setDraft] = useState<NewVehicle>(() => ({ ...blank, branch: user.branch || 'Varanasi' }));
   const [destination, setDestination] = useState('');
   const [query, setQuery] = useState('');
   const [branchFilter, setBranchFilter] = useState('All');
