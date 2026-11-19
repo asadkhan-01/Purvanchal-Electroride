@@ -1,3 +1,5 @@
+import SessionGate from './SessionGate';
+import { CurrentUser, clearLoginCredentials } from './api/enquiries';
 import LiveInventory from './LiveInventory';
 import LiveCRM from './LiveCRM';
 import { apiConfigured } from './api/enquiries';
@@ -38,6 +40,9 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 export default function App() {
   const [section, setSection] = useState<Section>('Overview');
+  const [session, setSession] = useState<CurrentUser | null>(null);
+  const logout = () => { clearLoginCredentials(); setSession(null); setSection('Overview'); };
+
   const [search, setSearch] = useState('');
   const { width } = useWindowDimensions();
   const wide = width >= 850;
@@ -64,10 +69,12 @@ export default function App() {
               <Text style={styles.pageHeading}>{section === 'Overview' ? 'Dashboard' : section}</Text>
               <Text style={styles.subtitle}>Multi-branch dealership management</Text>
             </View>
-            <View style={styles.avatar}><Text style={styles.avatarText}>AD</Text></View>
+            {apiConfigured && session && <Pressable onPress={logout} style={{ padding: 10, marginRight: 8 }}><Text style={{ color: colors.teal, fontWeight: '700' }}>Sign out</Text></Pressable>}
+            <View style={styles.avatar}><Text style={styles.avatarText}>{session ? session.displayName.slice(0, 2).toUpperCase() : 'PE'}</Text></View>
           </View>
           <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard, sales and finance are sample data. CRM and Inventory use the API only when configured.</Text></View>
+            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard, Sales and Finance use demo data. Enquiries and Inventory use persistent APIs when configured and signed in.</Text></View>
+            {apiConfigured && !session ? <SessionGate user={session} onSignIn={setSession} /> : <>
             {section === 'Overview' && <>
               <View style={[styles.hero, wide && { flexDirection: 'row', alignItems: 'center' }]}>
                 <View style={{ flex: 1 }}>
@@ -93,10 +100,11 @@ export default function App() {
                 <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{e.name}</Text><Text style={styles.rowSub}>{e.detail}</Text></View>
                 <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
             </>}
-            {section === 'Enquiries' && (apiConfigured ? <LiveCRM /> : <CRM />)}
-            {section === 'Inventory' && (apiConfigured ? <LiveInventory /> : <Inventory />)}
+            {section === 'Enquiries' && (apiConfigured && session ? <LiveCRM user={session} /> : <CRM />)}
+            {section === 'Inventory' && (apiConfigured && session ? <LiveInventory user={session} /> : <Inventory />)}
             {section === 'Sales' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings, vehicle allocation, tax invoices and deliveries will appear here. Demo snapshot: 24 vehicles delivered this month.</Text></View>}
             {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
+            </>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
           </ScrollView>
           {!wide && <View style={styles.bottomNav}>{sections.map(item => <Pressable key={item} onPress={() => setSection(item)} style={styles.bottomItem}>
