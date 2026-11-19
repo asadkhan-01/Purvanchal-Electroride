@@ -41,6 +41,7 @@ class BookingPersistenceIT {
     @Autowired EnquiryRepository enquiries;
     @Autowired VehicleRepository vehicles;
     @Autowired PasswordEncoder encoder;
+    @Autowired in.purvanchal.electroride.quotation.BookingQuotationRepository quotations;
     @org.springframework.boot.test.web.server.LocalServerPort int port;
 
     @BeforeEach
@@ -231,6 +232,56 @@ class BookingPersistenceIT {
             "/api/v1/bookings", json(validPayload), String.class)
             .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(vehicles.findById(scooter.id).orElseThrow().status).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void quotationPersistsExactAmountsAndRequiresManagerApproval() {
+        Vehicle scooter = vehicle();
+        String bookingPayload = "{\"chassis\":\"" + scooter.chassis
+            + "\",\"customerName\":\"Quote Customer\",\"customerPhone\":\"9876543210\"}";
+        ResponseEntity<Booking> booked = as("booking-sales").postForEntity(
+            "/api/v1/bookings", json(bookingPayload), Booking.class);
+        assertThat(booked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Long id = booked.getBody().id;
+
+        String quotationBody = """
+            {"vehiclePrice":105000.25,"discount":5000.10,
+             "accessories":2250.25,"otherCharges":750.00}
+            """;
+        ResponseEntity<in.purvanchal.electroride.quotation.BookingQuotation> created =
+            as("booking-sales").postForEntity("/api/v1/bookings/" + id + "/quotation",
+                json(quotationBody), in.purvanchal.electroride.quotation.BookingQuotation.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody().status).isEqualTo("DRAFT");
+        assertThat(created.getBody().subtotalExcludingTax)
+            .isEqualByComparingTo("103000.40");
+        assertThat(quotations.findByBookingId(id)).isPresent();
+
+        assertThat(as("booking-other").getForEntity(
+            "/api/v1/bookings/" + id + "/quotation", String.class).getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(as("booking-sales").postForEntity(
+            "/api/v1/bookings/" + id + "/quotation/approve", HttpEntity.EMPTY, String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(as("booking-manager").postForEntity(
+            "/api/v1/bookings/" + id + "/quotation", json(quotationBody), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        ResponseEntity<in.purvanchal.electroride.quotation.BookingQuotation> approved =
+            as("booking-manager").postForEntity(
+                "/api/v1/bookings/" + id + "/quotation/approve", HttpEntity.EMPTY,
+                in.purvanchal.electroride.quotation.BookingQuotation.class);
+        assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(approved.getBody().status).isEqualTo("APPROVED");
+        assertThat(approved.getBody().approvedBy).isEqualTo("booking-manager");
+        assertThat(as("booking-manager").postForEntity(
+            "/api/v1/bookings/" + id + "/quotation/approve", HttpEntity.EMPTY, String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        BookingEvent[] audit = as("booking-manager").getForObject(
+            "/api/v1/bookings/" + id + "/events", BookingEvent[].class);
+        assertThat(audit).extracting(event -> event.event)
+            .contains("QUOTATION_CREATED", "QUOTATION_APPROVED");
     }
 
 }
