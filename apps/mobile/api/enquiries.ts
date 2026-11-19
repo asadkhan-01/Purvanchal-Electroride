@@ -31,6 +31,11 @@ export type CurrentUser = {
 // Credentials are intentionally kept only in application memory and cleared on logout.
 // Development-only Basic authentication; must be replaced for production use.
 let authorization: string | null = null;
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
 function encodeAsciiBase64(value: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   let result = '';
@@ -64,6 +69,10 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers || {}),
     },
   });
+  if (response.status === 401) {
+    clearLoginCredentials();
+    onUnauthorized?.();
+  }
   if (!response.ok) {
     const error = await response.text().catch(() => '');
     throw new Error('API ' + response.status + ': ' + (error.slice(0, 160) || response.statusText));
