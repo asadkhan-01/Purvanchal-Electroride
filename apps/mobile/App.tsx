@@ -1,3 +1,4 @@
+import LiveBookings from './LiveBookings';
 import SessionGate from './SessionGate';
 import { CurrentUser, clearLoginCredentials, setUnauthorizedHandler } from './api/enquiries';
 import LiveInventory from './LiveInventory';
@@ -40,8 +41,9 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 export default function App() {
   const [section, setSection] = useState<Section>('Overview');
+  const [bookingEnquiryId, setBookingEnquiryId] = useState<number | null>(null);
   const [session, setSession] = useState<CurrentUser | null>(null);
-  const logout = () => { clearLoginCredentials(); setSession(null); setSection('Overview'); };
+  const logout = () => { clearLoginCredentials(); setSession(null); setBookingEnquiryId(null); setSection('Overview'); };
   useEffect(() => {
     setUnauthorizedHandler(() => { setSession(null); setSection('Overview'); });
     return () => setUnauthorizedHandler(null);
@@ -104,9 +106,9 @@ export default function App() {
                 <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{e.name}</Text><Text style={styles.rowSub}>{e.detail}</Text></View>
                 <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
             </>}
-            {section === 'Enquiries' && (apiConfigured && session ? <LiveCRM user={session} /> : <CRM />)}
+            {section === 'Enquiries' && (apiConfigured && session ? <LiveCRM user={session} onStartBooking={id => { setBookingEnquiryId(id); setSection('Sales'); }} /> : <CRM />)}
             {section === 'Inventory' && (apiConfigured && session ? <LiveInventory user={session} /> : <Inventory />)}
-            {section === 'Sales' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings, vehicle allocation, tax invoices and deliveries will appear here. Demo snapshot: 24 vehicles delivered this month.</Text></View>}
+            {section === 'Sales' && (apiConfigured && session ? <LiveBookings user={session} enquiryId={bookingEnquiryId} onClearEnquiry={() => setBookingEnquiryId(null)} /> : <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings and allocations are available when the API is configured. Invoices and deliveries are planned.</Text></View>)}
             {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
             </>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
