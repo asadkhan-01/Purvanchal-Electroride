@@ -1,6 +1,7 @@
 package in.purvanchal.electroride.inventory;
 
 import in.purvanchal.electroride.security.AppUser;
+import in.purvanchal.electroride.booking.BookingRepository;
 import in.purvanchal.electroride.security.EnquiryAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -21,13 +22,15 @@ public class InventoryController {
     private final VehicleMovementRepository movements;
     private final EnquiryAccess users;
     private final InventoryPolicy policy;
+    private final BookingRepository bookings;
 
     public InventoryController(VehicleRepository vehicles, VehicleMovementRepository movements,
-                               EnquiryAccess users, InventoryPolicy policy) {
+                               EnquiryAccess users, InventoryPolicy policy, BookingRepository bookings) {
         this.vehicles = vehicles;
         this.movements = movements;
         this.users = users;
         this.policy = policy;
+        this.bookings = bookings;
     }
 
     public record RegisterVehicle(
@@ -112,6 +115,8 @@ public class InventoryController {
         policy.requireView(actor, vehicle);
         policy.requireManager(actor, vehicle.branch);
         requireStatus(vehicle, "RESERVED");
+        if (bookings.existsByVehicleIdAndStatusIn(vehicle.id, List.of("PENDING", "CONFIRMED")))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cancel the booking before releasing this vehicle");
         vehicle.status = "AVAILABLE";
         log(vehicle, "RELEASED", vehicle.branch, vehicle.branch, actor.username);
         return vehicles.save(vehicle);
