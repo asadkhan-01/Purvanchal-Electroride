@@ -12,6 +12,7 @@ public class Booking {
     @Column(name = "vehicle_id", nullable = false) public Long vehicleId;
     @Column(nullable = false) public String branch;
     @Column(nullable = false) public String status = "PENDING";
+    @Column(name = "prior_enquiry_stage", nullable = false) public String priorEnquiryStage;
     @Column(name = "created_by", nullable = false) public String createdBy;
     @Column(name = "confirmed_by") public String confirmedBy;
     @Column(name = "cancelled_by") public String cancelledBy;
