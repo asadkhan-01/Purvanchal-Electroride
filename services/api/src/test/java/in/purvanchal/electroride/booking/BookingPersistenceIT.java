@@ -168,4 +168,69 @@ class BookingPersistenceIT {
             "/api/v1/bookings", json(body), String.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(vehicles.findById(scooter.id).orElseThrow().status).isEqualTo("AVAILABLE");
     }
+    @Test
+    void directBookingBySalespersonCanBeConfirmedAndCancelledByManager() {
+        Vehicle scooter = vehicle();
+        String payload = "{\"chassis\":\"" + scooter.chassis
+            + "\",\"customerName\":\"Walk-in Customer\",\"customerPhone\":\"9876543210\"}";
+        ResponseEntity<Booking> created = as("booking-sales").postForEntity(
+            "/api/v1/bookings", json(payload), Booking.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Booking booking = created.getBody();
+        assertThat(booking).isNotNull();
+        assertThat(booking.enquiryId).isNull();
+        assertThat(booking.priorEnquiryStage).isNull();
+        assertThat(booking.customerName).isEqualTo("Walk-in Customer");
+        assertThat(booking.salesperson).isEqualTo("Aman");
+        assertThat(vehicles.findById(scooter.id).orElseThrow().status).isEqualTo("RESERVED");
+
+        assertThat(as("booking-other").getForEntity("/api/v1/bookings/" + booking.id, String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(as("booking-sales").getForEntity("/api/v1/bookings/" + booking.id, Booking.class)
+            .getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(as("booking-sales").postForEntity(
+            "/api/v1/bookings/" + booking.id + "/confirm", HttpEntity.EMPTY, String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        Enquiry unrelatedEnquiry = enquiry();
+        String otherBooking = "{\"enquiryId\":" + unrelatedEnquiry.id
+            + ",\"chassis\":\"" + scooter.chassis + "\"}";
+        assertThat(as("booking-admin").postForEntity(
+            "/api/v1/bookings", json(otherBooking), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        ResponseEntity<Booking> confirmed = as("booking-manager").postForEntity(
+            "/api/v1/bookings/" + booking.id + "/confirm", HttpEntity.EMPTY, Booking.class);
+        assertThat(confirmed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(confirmed.getBody().enquiryId).isNull();
+        assertThat(confirmed.getBody().status).isEqualTo("CONFIRMED");
+
+        ResponseEntity<Booking> cancelled = as("booking-manager").postForEntity(
+            "/api/v1/bookings/" + booking.id + "/cancel",
+            json("{\"reason\":\"Walk-in customer withdrew\"}"), Booking.class);
+        assertThat(cancelled.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(cancelled.getBody().status).isEqualTo("CANCELLED");
+        assertThat(vehicles.findById(scooter.id).orElseThrow().status).isEqualTo("AVAILABLE");
+
+        BookingEvent[] events = as("booking-sales").getForObject(
+            "/api/v1/bookings/" + booking.id + "/events", BookingEvent[].class);
+        assertThat(events).extracting(e -> e.event).contains(
+            "CREATED_DIRECT", "CONFIRMED", "CANCELLED");
+    }
+
+    @Test
+    void directBookingRejectsMissingCustomerAndWrongBranch() {
+        Vehicle scooter = vehicle();
+        String missingCustomer = "{\"chassis\":\"" + scooter.chassis + "\"}";
+        assertThat(as("booking-sales").postForEntity(
+            "/api/v1/bookings", json(missingCustomer), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        String validPayload = "{\"chassis\":\"" + scooter.chassis
+            + "\",\"customerName\":\"Walk-in\",\"customerPhone\":\"9876543210\"}";
+        assertThat(as("booking-other").postForEntity(
+            "/api/v1/bookings", json(validPayload), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(vehicles.findById(scooter.id).orElseThrow().status).isEqualTo("AVAILABLE");
+    }
+
 }
