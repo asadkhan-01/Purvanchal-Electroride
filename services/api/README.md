@@ -2,7 +2,7 @@
 
 Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Flyway
 
-**Development only.** The API currently has **no authentication or server-enforced branch access**. Never expose it to the public internet or use real customer information.
+**Development only.** The API now uses database-backed Spring Security HTTP Basic authentication and enforces enquiry read/write scope by role and branch. This is **not production-grade authentication** (no MFA, login throttling, secure session lifecycle, credential rotation or enterprise audit yet). Keep API port 8080 private and use test data only.
 
 ## Start in GitHub Codespaces
 
@@ -11,15 +11,45 @@ From repository root:
 ```bash
 docker compose -f infra/docker-compose.yml up -d
 cd services/api
-mvn spring-boot:run
+BOOTSTRAP_ADMIN_USERNAME=admin BOOTSTRAP_ADMIN_PASSWORD='REPLACE_WITH_A_STRONG_RANDOM_PASSWORD' mvn spring-boot:run
 ```
 
 The server uses port 8080 and reads PostgreSQL connection settings from `DB_URL`, `DB_USER`, and `DB_PASSWORD`. Default credentials are local development placeholders only.
 
-Database migrations run automatically at startup:
+The initial admin is created **only when** `app_users` contains no users and both bootstrap variables are supplied. Choose a unique password of at least 12 characters; never commit it. On subsequent restarts the existing password remains unchanged. If users already exist, no account is automatically added. The bootstrap credentials are for initial development setup only.\n\nDatabase migrations run automatically at startup:
 
 - `V1__create_enquiries.sql` — enquiries
-- `V2__create_enquiry_activities.sql` — append-only enquiry activity messages
+- `V2__create_enquiry_activities.sql` — append-only enquiry activity messages\n- `V3__create_app_users.sql` — username, BCrypt password hash, role, assigned branch and enabled state
+
+## Authentication and permissions
+
+All `/api/v1/**` endpoints require an authenticated user.
+
+| Role | Enquiry scope | Allowed creation |
+|---|---|---|
+| `ADMIN` | All branches | Any branch and salesperson |
+| `BRANCH_MANAGER` | Assigned branch | Assigned branch |
+| `SALESPERSON` | Their branch and matching assigned salesperson name | Only their own name in their branch |
+
+Enquiry reads, activity history, follow-up updates and stage changes are restricted server-side. Inaccessible records return 404 to avoid revealing their existence. User management is admin-only.
+
+Current development authentication: `Authorization: Basic <base64(username:password)>` over HTTPS for remote previews. The mobile app holds credentials only in memory and clears them on logout. Use a production-ready authentication architecture before releasing the app.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | /api/v1/auth/me | Authenticated user identity and scope |
+| GET | /api/v1/users | Admin-only user listing (no password hashes) |
+| POST | /api/v1/users | Admin-only provisioning |
+
+Example: create a **test salesperson** using the admin account after startup. You can use `curl -u admin` to enter the password interactively; no password is embedded in the shell command or repository:
+
+```bash
+curl -u admin -H 'Content-Type: application/json' \\
+  -d '{"username":"aman","password":"REPLACE_WITH_A_DIFFERENT_STRONG_PASSWORD","displayName":"Aman","role":"SALESPERSON","branch":"Varanasi"}' \\
+  http://localhost:8080/api/v1/users
+```
+
+Do not use the literal placeholder password or real identities. Passwords entered as literal JSON in commands may remain in shell history; use test-only credentials for this development exercise.
 
 ## CRM endpoints
 
@@ -70,7 +100,7 @@ For a Codespaces browser preview:
 4. Start the API with an explicit, exact web origin in `APP_CORS_ALLOWED_ORIGIN` (no path or trailing slash):
 
    ```bash
-   APP_CORS_ALLOWED_ORIGIN=https://YOUR-CODESPACE-8081.app.github.dev mvn spring-boot:run
+   APP_CORS_ALLOWED_ORIGIN=https://YOUR-CODESPACE-8081.app.github.dev \\\n   BOOTSTRAP_ADMIN_USERNAME=admin BOOTSTRAP_ADMIN_PASSWORD='REPLACE_WITH_A_STRONG_RANDOM_PASSWORD' \\\n   mvn spring-boot:run
    ```
 
 5. Restart Expo so it picks up the environment variable:
@@ -79,10 +109,10 @@ For a Codespaces browser preview:
    npx expo start --web --host localhost
    ```
 
-**Important browser limitation:** Private Codespaces forwarded URLs can require GitHub authorization. Cross-origin `fetch` may be redirected or blocked even with API CORS enabled. If that occurs, keep ports private, return to demo mode, and use a same-origin authenticated development proxy once introduced. **Do not change port 8080 to public** to bypass this restriction.
+Restart both the backend and Expo after changing the environment. The Expo API-backed CRM now prompts for credentials and reads role/branch identity from `GET /api/v1/auth/me`.\n\n**Important browser limitation:** Private Codespaces forwarded URLs can require GitHub authorization. Cross-origin `fetch` may be redirected or blocked even with API CORS enabled. If that occurs, keep ports private, return to demo mode, and use a same-origin authenticated development proxy once introduced. **Do not change port 8080 to public** to bypass this restriction.
 
 Any variable prefixed `EXPO_PUBLIC_` is embedded in the client bundle. It must **never** contain passwords, tokens or private secrets.
 
 ## Pending before production
 
-Authentication, proper branch-scoped authorization, activity author attribution, transaction boundaries for all mutations, CORS policy, server-side paging and filtering, API error handling, rate limits, audit logging, encrypted backups, security testing and API tests for role permissions.
+Production-grade authentication (short-lived tokens or secure cookie sessions, MFA, password reset, rate limiting), role administration, activity author attribution, paging, audit logging, backups, origin restrictions and complete penetration/security testing. HTTP Basic and disabled CSRF protection are development-only choices.
