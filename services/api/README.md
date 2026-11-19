@@ -24,6 +24,7 @@ Database migrations run automatically at startup:
 - `V2__create_enquiry_activities.sql` — append-only enquiry activity messages
 - `V3__create_app_users.sql` — username, BCrypt password hash, role, assigned branch and enabled state
 - `V4__create_inventory.sql` — chassis-level vehicles, component serial constraints and movement events
+- `V5__create_bookings.sql` — bookings, partial unique constraints for live allocations and booking events
 
 ## Authentication and permissions
 
@@ -90,6 +91,39 @@ The transfer state is `AVAILABLE → IN_TRANSIT → AVAILABLE`: `branch` stays a
 
 Invalid status transitions return 409. Duplicate chassis or component serials return 409. An inaccessible vehicle returns 404. Mutations record movement history and use pessimistic row locks to avoid concurrent state changes. **The API does not implement sale completion, purchasing, cancel-transfer, reservation-to-customer linkage, or inventory valuation yet.**
 
+## Sales & bookings API — milestone 10
+
+**Backend foundation only:** the Expo Sales screen is still a demo placeholder. No prices, customer deposits, invoices, delivery records or payment processing are implemented here.
+
+A booking links an existing CRM enquiry to a specific chassis in the **same branch**. Creation moves the vehicle from `AVAILABLE` to `RESERVED` and creates a `PENDING` booking. A branch manager or administrator may confirm it, moving the enquiry stage to `Booked`. Cancellation requires a reason, restores the vehicle to `AVAILABLE`, and restores the enquiry's previous stage if it was `Booked`. Events preserve the acting username.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | /api/v1/bookings | List bookings visible to current user's enquiry scope |
+| GET | /api/v1/bookings/{id} | Read an accessible booking |
+| GET | /api/v1/bookings/{id}/events | Booking lifecycle history |
+| POST | /api/v1/bookings | Create pending booking and allocate chassis |
+| POST | /api/v1/bookings/{id}/confirm | Confirm pending booking (manager/admin) |
+| POST | /api/v1/bookings/{id}/cancel | Cancel pending or confirmed booking and release stock (manager/admin) |
+
+**Example create payload:**
+
+```json
+{"enquiryId": 123, "chassis": "CHASSIS-001"}
+```
+
+**Example cancel payload:**
+
+```json
+{"reason": "Customer withdrew before delivery"}
+```
+
+Permissions: administrators can see all bookings. Branch managers see bookings associated with enquiries in their branch; salespeople see bookings for their own assigned enquiries. An authorized salesperson can create a pending booking for their own enquiry, but **only managers/admins confirm or cancel**. An inaccessible booking returns 404.
+
+Concurrency and safety: vehicle-row locks and PostgreSQL partial unique indexes prevent multiple live bookings for one vehicle or enquiry; invalid lifecycle transitions return HTTP 409. The inventory release endpoint refuses to free a chassis held by a live booking. Cancel the booking through the booking API instead. Do not use the generic inventory reservation endpoint for customer bookings.
+
+**Remaining work:** authoritative pricing, quotation, customer approval, deposits/refunds, reservation expiry, delivery, invoicing, GST, sale completion, and enforcing cross-module CRM stage consistency.
+
 ## Automated tests
 
 ```bash
@@ -98,7 +132,7 @@ mvn test          # Controller unit/web-slice tests with mocked repositories
 mvn verify        # Unit tests + PostgreSQL Testcontainers integration tests
 ```
 
-The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
+The `BookingControllerTest`, `BookingServiceTest` and `BookingPersistenceIT` cover booking validation, state transitions, duplicate allocations, cancellation release, security and PostgreSQL persistence. The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
 
 An optional **read-only** smoke test checks an already-running API:
 
