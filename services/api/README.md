@@ -48,6 +48,17 @@ Current development authentication: `Authorization: Basic <base64(username:passw
 | GET | /api/v1/users | Admin-only user listing (no password hashes) |
 | POST | /api/v1/users | Admin-only provisioning |
 
+### Create three test-role accounts using the Expo UI
+
+The Expo web/mobile app already has a shared sign-in screen. It appears when `EXPO_PUBLIC_API_URL` is set to a reachable Spring Boot HTTPS endpoint and the browser has loaded the updated bundle. After signing in as an **ADMIN**, open the **Users** tab. The administrator can view existing accounts and create other administrators, branch managers and salespeople; passwords are stored server-side as BCrypt hashes. The Users tab is not shown to non-admin users, and `/api/v1/users` rejects unauthorized requests.
+
+For a first-time development database, bootstrap the initial admin by starting Spring Boot with `BOOTSTRAP_ADMIN_USERNAME` and a **unique strong** `BOOTSTRAP_ADMIN_PASSWORD` (at least 12 characters), as described above. Bootstrapping runs only when the users table is empty. Restarting with different bootstrap variables will not reset the password of an existing user.
+
+For role-based testing, create a **Branch Manager** and a **Salesperson** assigned to the same test branch (for example, Varanasi), and give each account a unique test password. Sign out and sign back in with each account to verify their allowed modules and actions. Do **not** put test passwords in repository files, screenshots or `EXPO_PUBLIC_` variables.
+
+The current interface supports user creation and listing, not password resets, disabling users or changing existing roles. These controls require a later security milestone.
+
+
 Example: create a **test salesperson** using the admin account after startup. You can use `curl -u admin` to enter the password interactively; no password is embedded in the shell command or repository:
 
 ```bash
