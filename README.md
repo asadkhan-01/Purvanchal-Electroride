@@ -2,15 +2,15 @@
 
 A multi-branch electric-vehicle dealership management system for new EVs, targeting approximately 3–5 branches.
 
-> **Development status:** The Expo dashboard, enquiry CRM and vehicle inventory interfaces exist. The Spring Boot API supports PostgreSQL-backed enquiries, chassis-level inventory and booking allocations, with development-only database-backed authentication and branch-scoped access. Enquiries and Inventory use persistent APIs when configured; the Sales & Bookings API is implemented but its Expo screen and Finance remain demo placeholders. **No real customer or financial data should be used yet.**
+> **Development status:** The Expo dashboard, enquiry CRM and vehicle inventory interfaces exist. The Spring Boot API supports PostgreSQL-backed enquiries, chassis-level inventory and booking allocations, with development-only database-backed authentication and branch-scoped access. Enquiries and Inventory use persistent APIs when configured; the Sales & Bookings API supports enquiry-linked and direct bookings, with an authenticated Expo Sales screen. Finance remains a demo placeholder. **No real customer or financial data should be used yet.**
 
 ## Architecture
 
 | Layer | Technology | Status |
 |---|---|---|
-| Mobile and web preview | Expo SDK 58, React Native, TypeScript | Dashboard and opt-in API-backed CRM and inventory |
+| Mobile and web preview | Expo SDK 58, React Native, TypeScript | Dashboard and opt-in API-backed CRM, inventory and bookings |
 | API | Java 21, Spring Boot 3.5 | CRM, inventory and bookings endpoints |
-| Database | PostgreSQL 16 + Flyway | Enquiries, activities, users, vehicles, movements and bookings |
+| Database | PostgreSQL 16 + Flyway | Enquiries, activities, users, vehicles, movements and direct/linked bookings |
 | Integration tests | JUnit 5, Spring Boot Test, Testcontainers | CRM, security, inventory and booking lifecycle tests |
 | CI | GitHub Actions | Backend unit/integration checks and Expo TypeScript checks |
 | Web admin | React/TypeScript | Planned |
@@ -66,7 +66,7 @@ Open the forwarded **8081** port in Codespaces. The web preview works in demo mo
 
 The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** with one app-wide sign-in screen for CRM and Inventory. The account's role and branch are obtained once from `/api/v1/auth/me`, retained in React state while the app is running, and passed to both modules. Credentials are held in memory only; sign-out or an HTTP 401 clears them and returns the app to sign-in. A page reload also requires signing in again. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
 
-The booking API has also been added, but the Sales screen is not connected to it yet. See **[API setup, booking endpoints, and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
+The Sales screen is API-connected as well. A salesperson can continue an enquiry into a booking using **Continue to booking**, or start a **Direct booking** from Sales without first creating an enquiry. Both paths allocate a specific available chassis and record customer details; managers confirm or cancel bookings. This is a booking/allocation workflow only, not a completed sale or invoice. See **[API setup, booking endpoints, and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
 
 ## Automated tests
 
@@ -103,9 +103,9 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 7. **Backend CI verified — Inventory backend:** persistent chassis and component serials, reservation, branch transfer, receipt, movement history and server-side branch enforcement.
 8. **Implemented, new CI verification pending — Inventory UI integration:** API-connected inventory with role-aware controls and automated frontend rule tests; demo fallback remains.
 9. **Implemented, CI pending — Shared development login:** a single Expo sign-in, shared role/branch identity, centralized logout and automatic reset on HTTP 401; mobile unit tests cover credential handling.
-10. **Implemented, CI verification pending — Sales & Bookings backend:** link enquiry to chassis, prevent duplicate live allocations, confirm pending bookings, cancel with a reason, restore stock, record lifecycle events, and test against PostgreSQL.
-11. **Next — Sales & Bookings Expo integration:** build the authenticated booking screen with eligible enquiries and available vehicles.
-12. **Later —** quotes, payments, invoices, delivery, GST, accounting, finance reconciliation and production hardening.
+10. **Implemented — Sales & Bookings foundation:** booking allocation, confirmation, cancellation, audit events and PostgreSQL uniqueness protection.
+11. **Implemented, new CI verification pending — Direct and enquiry-linked bookings:** Flyway V6 migration, direct customer capture without a dummy enquiry, CRM → Sales handoff, authenticated Sales UI, and unit/PostgreSQL tests.
+12. **Next —** quotes, pricing and booking payments; then invoices, delivery, GST, accounting, finance reconciliation and production hardening.
 
 ## Safety and compliance
 
