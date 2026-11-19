@@ -31,9 +31,10 @@ class DevelopmentCorsConfigurationTest {
         mvc.perform(options("/api/v1/enquiries")
             .header("Origin", "https://example-8081.app.github.dev")
             .header("Access-Control-Request-Method", "POST")
-            .header("Access-Control-Request-Headers", "content-type"))
+            .header("Access-Control-Request-Headers", "content-type,authorization"))
             .andExpect(status().isOk())
-            .andExpect(header().string("Access-Control-Allow-Origin", "https://example-8081.app.github.dev"));
+            .andExpect(header().string("Access-Control-Allow-Origin", "https://example-8081.app.github.dev"))
+            .andExpect(header().exists("Access-Control-Allow-Headers"));
     }
 
     @Test
