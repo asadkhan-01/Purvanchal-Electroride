@@ -122,4 +122,46 @@ class BookingServiceTest {
                 ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
         verify(vehicles, never()).save(any());
     }
+    @Test
+    void directBookingReservesStockWithoutCreatingEnquiry() {
+        actor.role = "SALESPERSON";
+        actor.branch = "Varanasi";
+        actor.displayName = "Aman";
+        when(vehicles.lockByChassis("CH-100")).thenReturn(Optional.of(vehicle));
+        when(bookings.saveAndFlush(any(Booking.class))).thenAnswer(inv -> {
+            Booking saved = inv.getArgument(0);
+            saved.id = 20L;
+            return saved;
+        });
+        Booking booking = service.createDirect("ch-100", "Walk-in customer", "9876543210", actor);
+        assertThat(booking.enquiryId).isNull();
+        assertThat(booking.priorEnquiryStage).isNull();
+        assertThat(booking.salesperson).isEqualTo("Aman");
+        assertThat(booking.status).isEqualTo("PENDING");
+        assertThat(vehicle.status).isEqualTo("RESERVED");
+        verifyNoInteractions(enquiries);
+        verify(vehicles).save(vehicle);
+        verify(events).save(any(BookingEvent.class));
+    }
+
+    @Test
+    void directBookingRejectsInvalidCustomerData() {
+        assertThatThrownBy(() -> service.createDirect("CH-100", "", "123", actor))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verifyNoInteractions(vehicles);
+    }
+
+    @Test
+    void directBookingRejectsOtherBranchForSalesperson() {
+        actor.role = "SALESPERSON";
+        actor.branch = "Ghazipur";
+        actor.displayName = "Sana";
+        when(vehicles.lockByChassis("CH-100")).thenReturn(Optional.of(vehicle));
+        assertThatThrownBy(() -> service.createDirect("CH-100", "Walk-in", "9876543210", actor))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        verify(bookings, never()).saveAndFlush(any());
+    }
+
 }
