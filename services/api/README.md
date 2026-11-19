@@ -35,6 +35,35 @@ curl -X POST http://localhost:8080/api/v1/enquiries \
 - POST /api/v1/enquiries
 - PATCH /api/v1/enquiries/{id}/stage
 
+## Automated tests
+
+The test suite is checked into `src/test/java`.
+
+- `EnquiryControllerTest`: isolated MVC tests with a mocked repository, covering list, create, validation, stage update and 404 responses.
+- `EnquiryPersistenceIT`: real HTTP requests to a Spring Boot test server backed by an ephemeral PostgreSQL 16 Testcontainers instance. Flyway migrations run automatically.
+- `EnquiryLiveSmokeIT`: optional, read-only checks against the already-running backend.
+
+Run unit tests without stopping your running API:
+
+```bash
+cd services/api
+mvn test
+```
+
+Run unit and PostgreSQL integration tests (requires Docker in Codespaces):
+
+```bash
+mvn verify
+```
+
+Run only the read-only live smoke test against your running API:
+
+```bash
+RUN_LIVE_SMOKE=true mvn -Dit.test=EnquiryLiveSmokeIT failsafe:integration-test failsafe:verify
+```
+
+Integration tests do **not** use the development PostgreSQL database. Live smoke tests do **not** create or modify records.
+
 ## Before any real usage
 
 Implement authentication, branch-scoped authorization, audit logging, activity/follow-up tables, request limits, CORS configuration, error handling, tests, backups and secure secrets. The Expo CRM screen still uses in-memory demo data and is **not** connected to this API.
