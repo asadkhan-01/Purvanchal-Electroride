@@ -26,7 +26,10 @@ export default function LiveCRM({ user }: { user: CurrentUser }) {
   const [events, setEvents] = useState<Activity[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<NewEnquiry>(empty);
+  const [draft, setDraft] = useState<NewEnquiry>(() => ({ ...empty,
+    branch: user.branch || 'Varanasi',
+    salesperson: user.role === 'SALESPERSON' ? user.displayName : 'Aman',
+  }));
   const [query, setQuery] = useState('');
   const [newActivity, setNewActivity] = useState('');
   const [newFollowUp, setNewFollowUp] = useState('');
