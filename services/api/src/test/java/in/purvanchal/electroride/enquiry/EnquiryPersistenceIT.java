@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.springframework.http.*;
 import in.purvanchal.electroride.security.AppUser;
+import in.purvanchal.electroride.enquiry.EnquiryRepository;
 import in.purvanchal.electroride.security.AppUserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Base64;
@@ -42,6 +43,7 @@ class EnquiryPersistenceIT {
 
     @Autowired TestRestTemplate rest;
     @Autowired AppUserRepository users;
+    @Autowired EnquiryRepository enquiries;
     @Autowired PasswordEncoder encoder;
     @LocalServerPort int port;
 
@@ -128,4 +130,73 @@ class EnquiryPersistenceIT {
         Enquiry[] list = rest.getForObject("/api/v1/enquiries", Enquiry[].class);
         assertThat(list).isNotNull();
     }
+    @Test
+    void rejectsUnauthenticatedRequestsAndProtectsCrossBranchData() {
+        TestRestTemplate anonymous = new TestRestTemplate();
+        assertThat(anonymous.getForEntity("http://localhost:" + port + "/api/v1/enquiries",
+            String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        Enquiry owned = new Enquiry();
+        owned.customerName = "Owner Sample";
+        owned.phone = "9876500001";
+        owned.branch = "Varanasi";
+        owned.salesperson = "Aman";
+        owned.source = "Walk-in";
+        owned.interestedModel = "Demo EV";
+        owned = enquiries.save(owned);
+
+        Enquiry outside = new Enquiry();
+        outside.customerName = "Other Branch Sample";
+        outside.phone = "9876500002";
+        outside.branch = "Ghazipur";
+        outside.salesperson = "Sana";
+        outside.source = "Phone";
+        outside.interestedModel = "Demo EV";
+        outside = enquiries.save(outside);
+
+        AppUser sales = new AppUser();
+        sales.username = "sales-aman";
+        sales.passwordHash = encoder.encode("sales-password-123");
+        sales.displayName = "Aman";
+        sales.role = "SALESPERSON";
+        sales.branch = "Varanasi";
+        users.save(sales);
+
+        TestRestTemplate salesperson = rest.withBasicAuth("sales-aman", "sales-password-123");
+        ResponseEntity<Enquiry[]> list = salesperson.getForEntity("/api/v1/enquiries", Enquiry[].class);
+        assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(list.getBody()).extracting(e -> e.id).contains(owned.id).doesNotContain(outside.id);
+        assertThat(salesperson.getForEntity("/api/v1/enquiries/" + outside.id, String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        String unauthorizedCreation = """
+            {"customerName":"Wrong Branch","phone":"9876500003","branch":"Ghazipur",
+             "salesperson":"Aman","source":"Walk-in","interestedModel":"Demo EV"}
+            """;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<String> forbidden = salesperson.postForEntity("/api/v1/enquiries",
+            new HttpEntity<>(unauthorizedCreation, headers), String.class);
+        assertThat(forbidden.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void onlyAdministratorCanProvisionUsers() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String payload = """
+            {"username":"branch-manager-test","password":"strong-manager-pass-123",
+             "displayName":"Demo Manager","role":"BRANCH_MANAGER","branch":"Varanasi"}
+            """;
+        ResponseEntity<String> created = rest.postForEntity("/api/v1/users",
+            new HttpEntity<>(payload, headers), String.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody()).contains("branch-manager-test").doesNotContain("strong-manager-pass-123");
+
+        TestRestTemplate manager = rest.withBasicAuth("branch-manager-test", "strong-manager-pass-123");
+        assertThat(manager.getForEntity("/api/v1/auth/me", String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(manager.getForEntity("/api/v1/users", String.class).getStatusCode())
+            .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
 }
