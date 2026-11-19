@@ -3,7 +3,6 @@ package in.purvanchal.electroride.booking;
 import in.purvanchal.electroride.security.EnquiryAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -21,7 +20,8 @@ public class BookingController {
         this.access = access;
     }
 
-    public record CreateBooking(@NotNull Long enquiryId, @NotBlank String chassis) {}
+    public record CreateBooking(Long enquiryId, @NotBlank String chassis,
+                                String customerName, String customerPhone) {}
     public record CancelBooking(@NotBlank @Size(max = 500) String reason) {}
 
     @GetMapping
@@ -42,7 +42,14 @@ public class BookingController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Booking create(@Valid @RequestBody CreateBooking input, Authentication authentication) {
-        return service.create(input.enquiryId(), input.chassis(), access.current(authentication));
+        if (input.enquiryId() != null) {
+            if (input.customerName() != null || input.customerPhone() != null)
+                throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Use either enquiryId or direct customer details");
+            return service.create(input.enquiryId(), input.chassis(), access.current(authentication));
+        }
+        return service.createDirect(input.chassis(), input.customerName(), input.customerPhone(),
+            access.current(authentication));
     }
 
     @PostMapping("/{id}/confirm")
