@@ -111,8 +111,7 @@ class BookingPersistenceIT {
             "/api/v1/inventory/" + scooter.chassis + "/release", HttpEntity.EMPTY, String.class)
             .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         Vehicle otherScooter = vehicle();
-        String sameCustomerDifferentVehicle = "{\\"enquiryId\\":" + customer.id
-            + ",\\"chassis\\":\\"" + otherScooter.chassis + "\\"}";
+        String sameCustomerDifferentVehicle = "{\"enquiryId\":" + customer.id + ",\"chassis\":\"" + otherScooter.chassis + "\"}";
         assertThat(as("booking-admin").postForEntity(
             "/api/v1/bookings", json(sameCustomerDifferentVehicle), String.class)
             .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
