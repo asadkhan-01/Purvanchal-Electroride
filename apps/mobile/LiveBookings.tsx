@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { CurrentUser, Enquiry, enquiryApi } from './api/enquiries';
 import { Vehicle, inventoryApi } from './api/inventory';
 import { Booking, BookingEvent, bookingApi } from './api/bookings';
+import { bookingPayload } from './bookingRules';
 
 type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
@@ -90,17 +91,14 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   };
 
   const create = () => {
-    if (!chassis) { setError('Select an available chassis.'); return; }
-    if (mode === 'enquiry') {
-      if (!enquiry) { setError('Select an existing enquiry.'); return; }
-      void perform(() => bookingApi.create({ enquiryId: enquiry.id, chassis }), 'Booking created from enquiry');
-    } else {
-      if (!customerName.trim() || !/^\d{10}$/.test(customerPhone.trim())) {
-        setError('Enter customer name and a 10-digit phone number.'); return;
-      }
-      void perform(() => bookingApi.create({
-        chassis, customerName: customerName.trim(), customerPhone: customerPhone.trim(),
-      }), 'Direct booking created');
+    try {
+      const payload = bookingPayload(
+        mode, chassis, enquiry?.id ?? null, customerName, customerPhone,
+      );
+      void perform(() => bookingApi.create(payload),
+        mode === 'enquiry' ? 'Booking created from enquiry' : 'Direct booking created');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Invalid booking details');
     }
   };
 
