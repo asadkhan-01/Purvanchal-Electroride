@@ -24,7 +24,7 @@ public class DevelopmentCorsConfiguration implements WebMvcConfigurer {
         registry.addMapping("/api/**")
             .allowedOrigins(origin)
             .allowedMethods("GET", "POST", "PATCH", "OPTIONS")
-            .allowedHeaders("Content-Type")
+            .allowedHeaders("Content-Type", "Authorization")
             .maxAge(1800);
     }
 }
