@@ -23,6 +23,7 @@ Database migrations run automatically at startup:
 - `V1__create_enquiries.sql` — enquiries
 - `V2__create_enquiry_activities.sql` — append-only enquiry activity messages
 - `V3__create_app_users.sql` — username, BCrypt password hash, role, assigned branch and enabled state
+- `V4__create_inventory.sql` — chassis-level vehicles, component serial constraints and movement events
 
 ## Authentication and permissions
 
@@ -68,6 +69,27 @@ Do not use the literal placeholder password or real identities. Passwords entere
 
 Follow-up dates use ISO `YYYY-MM-DD`. Stages are `New`, `Contacted`, `Interested`, `Booked` or `Lost`.
 
+## Vehicle inventory API — milestone 7
+
+The vehicle API is now persisted in PostgreSQL. The existing Expo inventory screen is **still demo-only**; no live inventory is displayed in the app yet.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | /api/v1/inventory | List accessible vehicles |
+| GET | /api/v1/inventory/{chassis} | Get vehicle by chassis |
+| GET | /api/v1/inventory/{chassis}/movements | Read transfer and reservation events |
+| POST | /api/v1/inventory | Register vehicle and component serials |
+| POST | /api/v1/inventory/{chassis}/reserve | Reserve an available vehicle |
+| POST | /api/v1/inventory/{chassis}/release | Release reservation |
+| POST | /api/v1/inventory/{chassis}/transfer | Start transfer to destination branch |
+| POST | /api/v1/inventory/{chassis}/receive | Confirm receiving branch receipt |
+
+Registration requires `chassis`, `model`, `variant`, `branch` and the unique `motorSerial`, `batterySerial`, `chargerSerial`, and `controllerSerial`. Chassis and serials are normalized to uppercase and constrained unique at the database level.
+
+The transfer state is `AVAILABLE → IN_TRANSIT → AVAILABLE`: `branch` stays as the source until receipt, and `transferDestination` records the destination. The destination branch manager or administrator confirms receipt. Only administrators and managers may modify stock; salespeople can view stock scoped to their branch, including inbound transfers.
+
+Invalid status transitions return 409. Duplicate chassis or component serials return 409. An inaccessible vehicle returns 404. Mutations record movement history and use pessimistic row locks to avoid concurrent state changes. **The API does not implement sale completion, purchasing, cancel-transfer, reservation-to-customer linkage, or inventory valuation yet.**
+
 ## Automated tests
 
 ```bash
@@ -76,7 +98,7 @@ mvn test          # Controller unit/web-slice tests with mocked repositories
 mvn verify        # Unit tests + PostgreSQL Testcontainers integration tests
 ```
 
-The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
+The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
 
 An optional **read-only** smoke test checks an already-running API:
 
