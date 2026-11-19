@@ -62,6 +62,17 @@ npx expo start --web --host localhost
 
 Open the forwarded **8081** port in Codespaces. The web preview works in demo mode without backend configuration.
 
+### Single-port preview via same-origin proxy
+
+When only one forwarded port is convenient (or cross-origin calls to port 8080 are blocked), serve the app and API from one origin:
+
+```bash
+echo 'EXPO_PUBLIC_API_URL=/backend' > apps/mobile/.env.local   # ignored file, no secrets
+node scripts/dev-proxy.mjs                                      # port 3000: /backend/* → 8080, rest → 8081
+```
+
+Start Spring Boot and Expo as above (no `APP_CORS_ALLOWED_ORIGIN` needed), then open port **3000**. Keep it private.
+
 ### Codespaces phone preview (private forwarding)
 
 To automatically configure the ignored Expo `.env.local` with the current Codespace's private HTTPS API URL (port 8080), run from the repository root:

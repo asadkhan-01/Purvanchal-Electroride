@@ -33,7 +33,7 @@ export default function SessionGate({ user, onSignIn }: Props) {
   if (user) return null;
   return <View style={styles.card}>
     <Text style={styles.title}>Sign in to Purvanchal Electroride</Text>
-    <Text style={styles.subtitle}>One development session for Enquiries and Inventory. Use test credentials only.</Text>
+    <Text style={styles.subtitle}>One development session for Enquiries, Inventory, Sales and Users. Use test credentials only.</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
     <Text style={styles.label}>Username</Text>
     <TextInput style={styles.input} value={username} onChangeText={setUsername}

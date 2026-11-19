@@ -57,7 +57,9 @@ export function setLoginCredentials(username: string, password: string) {
 export function clearLoginCredentials() { authorization = null; }
 
 export const apiUrl = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
-export const apiConfigured = apiUrl.startsWith('https://') || apiUrl.startsWith('http://localhost:');
+// A path such as '/backend' targets a same-origin development proxy (see scripts/dev-proxy.mjs).
+export const apiConfigured = apiUrl.startsWith('https://') || apiUrl.startsWith('http://localhost:')
+  || /^\/[A-Za-z0-9_-]+$/.test(apiUrl);
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!apiConfigured) throw new Error('API URL not configured');
