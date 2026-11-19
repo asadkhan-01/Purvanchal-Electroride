@@ -24,10 +24,11 @@ class EnquiryControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockitoBean EnquiryRepository repository;
+    @MockitoBean EnquiryActivityRepository activities;
 
     @BeforeEach
     void setup() {
-        reset(repository);
+        reset(repository, activities);
     }
 
     private Enquiry sample(long id) {
@@ -118,4 +119,75 @@ class EnquiryControllerTest {
             .andExpect(status().isBadRequest());
         verify(repository, never()).save(any());
     }
+    @Test
+    void listActivitiesRequiresExistingEnquiry() throws Exception {
+        when(repository.findById(999L)).thenReturn(Optional.empty());
+        mvc.perform(get("/api/v1/enquiries/999/activities"))
+            .andExpect(status().isNotFound());
+        verifyNoInteractions(activities);
+    }
+
+    @Test
+    void listActivitiesReturnsHistory() throws Exception {
+        when(repository.findById(7L)).thenReturn(Optional.of(sample(7)));
+        EnquiryActivity event = new EnquiryActivity();
+        event.id = 3L; event.enquiryId = 7L; event.message = "Customer called";
+        when(activities.findByEnquiryIdOrderByCreatedAtDescIdDesc(7L)).thenReturn(List.of(event));
+        mvc.perform(get("/api/v1/enquiries/7/activities"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].message").value("Customer called"));
+    }
+
+    @Test
+    void createActivityPersistsTrimmedMessage() throws Exception {
+        when(repository.findById(7L)).thenReturn(Optional.of(sample(7)));
+        when(activities.save(any(EnquiryActivity.class))).thenAnswer(invocation -> {
+            EnquiryActivity event = invocation.getArgument(0);
+            assertThat(event.message).isEqualTo("Customer called");
+            assertThat(event.enquiryId).isEqualTo(7L);
+            event.id = 8L;
+            return event;
+        });
+        mvc.perform(post("/api/v1/enquiries/7/activities")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"  Customer called  \"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(8));
+    }
+
+    @Test
+    void createActivityRejectsBlankMessage() throws Exception {
+        when(repository.findById(7L)).thenReturn(Optional.of(sample(7)));
+        mvc.perform(post("/api/v1/enquiries/7/activities")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"  \"}"))
+            .andExpect(status().isBadRequest());
+        verify(activities, never()).save(any());
+    }
+
+    @Test
+    void followUpIsSavedAndLogged() throws Exception {
+        Enquiry e = sample(7);
+        when(repository.findById(7L)).thenReturn(Optional.of(e));
+        when(repository.save(any(Enquiry.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(activities.save(any(EnquiryActivity.class))).thenAnswer(inv -> inv.getArgument(0));
+        mvc.perform(patch("/api/v1/enquiries/7/follow-up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"followUpDate\":\"2026-12-04\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.followUpDate").value("2026-12-04"));
+        verify(repository).save(eq(e));
+        verify(activities).save(any(EnquiryActivity.class));
+    }
+
+    @Test
+    void followUpRequiresDate() throws Exception {
+        when(repository.findById(7L)).thenReturn(Optional.of(sample(7)));
+        mvc.perform(patch("/api/v1/enquiries/7/follow-up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest());
+        verify(repository, never()).save(any());
+    }
+
 }
