@@ -16,10 +16,13 @@ BOOTSTRAP_ADMIN_USERNAME=admin BOOTSTRAP_ADMIN_PASSWORD='REPLACE_WITH_A_STRONG_R
 
 The server uses port 8080 and reads PostgreSQL connection settings from `DB_URL`, `DB_USER`, and `DB_PASSWORD`. Default credentials are local development placeholders only.
 
-The initial admin is created **only when** `app_users` contains no users and both bootstrap variables are supplied. Choose a unique password of at least 12 characters; never commit it. On subsequent restarts the existing password remains unchanged. If users already exist, no account is automatically added. The bootstrap credentials are for initial development setup only.\n\nDatabase migrations run automatically at startup:
+The initial admin is created **only when** `app_users` contains no users and both bootstrap variables are supplied. Choose a unique password of at least 12 characters; never commit it. On subsequent restarts the existing password remains unchanged. If users already exist, no account is automatically added. The bootstrap credentials are for initial development setup only.
+
+Database migrations run automatically at startup:
 
 - `V1__create_enquiries.sql` — enquiries
-- `V2__create_enquiry_activities.sql` — append-only enquiry activity messages\n- `V3__create_app_users.sql` — username, BCrypt password hash, role, assigned branch and enabled state
+- `V2__create_enquiry_activities.sql` — append-only enquiry activity messages
+- `V3__create_app_users.sql` — username, BCrypt password hash, role, assigned branch and enabled state
 
 ## Authentication and permissions
 
@@ -109,7 +112,9 @@ For a Codespaces browser preview:
    npx expo start --web --host localhost
    ```
 
-Restart both the backend and Expo after changing the environment. The Expo API-backed CRM now prompts for credentials and reads role/branch identity from `GET /api/v1/auth/me`.\n\n**Important browser limitation:** Private Codespaces forwarded URLs can require GitHub authorization. Cross-origin `fetch` may be redirected or blocked even with API CORS enabled. If that occurs, keep ports private, return to demo mode, and use a same-origin authenticated development proxy once introduced. **Do not change port 8080 to public** to bypass this restriction.
+Restart both the backend and Expo after changing the environment. The Expo API-backed CRM now prompts for credentials and reads role/branch identity from `GET /api/v1/auth/me`.
+
+**Important browser limitation:** Private Codespaces forwarded URLs can require GitHub authorization. Cross-origin `fetch` may be redirected or blocked even with API CORS enabled. If that occurs, keep ports private, return to demo mode, and use a same-origin authenticated development proxy once introduced. **Do not change port 8080 to public** to bypass this restriction.
 
 Any variable prefixed `EXPO_PUBLIC_` is embedded in the client bundle. It must **never** contain passwords, tokens or private secrets.
 
