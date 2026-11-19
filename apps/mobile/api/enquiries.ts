@@ -54,7 +54,7 @@ export function clearLoginCredentials() { authorization = null; }
 export const apiUrl = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 export const apiConfigured = apiUrl.startsWith('https://') || apiUrl.startsWith('http://localhost:');
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!apiConfigured) throw new Error('API URL not configured');
   const response = await fetch(apiUrl + path, {
     ...init,
