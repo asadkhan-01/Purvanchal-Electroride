@@ -1,0 +1,31 @@
+# Render Blueprint: one Docker web service (UI + API on one HTTPS origin) and a PostgreSQL database.
+# TEST DATA ONLY. Set BOOTSTRAP_ADMIN_PASSWORD in the Render dashboard when prompted; never commit it.
+services:
+  - type: web
+    name: electroride
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DB_HOST
+        fromDatabase: { name: electroride-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: electroride-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: electroride-db, property: database }
+      - key: DB_USER
+        fromDatabase: { name: electroride-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: electroride-db, property: password }
+      - key: BOOTSTRAP_ADMIN_USERNAME
+        value: admin
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: electroride-db
+    plan: free
+    databaseName: electroride
+    user: electroride
+    ipAllowList: []   # internal connections only
