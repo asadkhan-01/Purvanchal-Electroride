@@ -25,6 +25,7 @@ Database migrations run automatically at startup:
 - `V3__create_app_users.sql` — username, BCrypt password hash, role, assigned branch and enabled state
 - `V4__create_inventory.sql` — chassis-level vehicles, component serial constraints and movement events
 - `V5__create_bookings.sql` — bookings, partial unique constraints for live allocations and booking events
+- `V6__support_direct_bookings.sql` — optional enquiry linkage and customer/assigned-salesperson snapshots for both booking paths
 
 ## Authentication and permissions
 
@@ -91,38 +92,41 @@ The transfer state is `AVAILABLE → IN_TRANSIT → AVAILABLE`: `branch` stays a
 
 Invalid status transitions return 409. Duplicate chassis or component serials return 409. An inaccessible vehicle returns 404. Mutations record movement history and use pessimistic row locks to avoid concurrent state changes. **The API does not implement sale completion, purchasing, cancel-transfer, reservation-to-customer linkage, or inventory valuation yet.**
 
-## Sales & bookings API — milestone 10
+## Sales & Bookings API — direct and enquiry conversion
 
-**Backend foundation only:** the Expo Sales screen is still a demo placeholder. No prices, customer deposits, invoices, delivery records or payment processing are implemented here.
+The booking API supports **two workflows** and uses the same inventory reservation, manager confirmation, cancellation and auditing rules for each.
 
-A booking links an existing CRM enquiry to a specific chassis in the **same branch**. Creation moves the vehicle from `AVAILABLE` to `RESERVED` and creates a `PENDING` booking. A branch manager or administrator may confirm it, moving the enquiry stage to `Booked`. Cancellation requires a reason, restores the vehicle to `AVAILABLE`, and restores the enquiry's previous stage if it was `Booked`. Events preserve the acting username.
+1. **Enquiry → Booking:** A salesperson opens an existing accessible enquiry in CRM and selects **Continue to booking**, which opens Sales with that enquiry preselected. The API copies customer name, mobile, branch and assigned salesperson from the enquiry; clients must not override these fields.
+2. **Direct Booking:** A salesperson opens Sales → **Direct booking**, enters customer name and a 10-digit mobile number, and selects an available chassis in their branch. No dummy enquiry is created, and `enquiryId` remains `null`.
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | /api/v1/bookings | List bookings visible to current user's enquiry scope |
+| GET | /api/v1/bookings | List bookings visible to signed-in user's role and branch |
 | GET | /api/v1/bookings/{id} | Read an accessible booking |
-| GET | /api/v1/bookings/{id}/events | Booking lifecycle history |
-| POST | /api/v1/bookings | Create pending booking and allocate chassis |
+| GET | /api/v1/bookings/{id}/events | Audit lifecycle history |
+| POST | /api/v1/bookings | Create either linked or direct pending booking |
 | POST | /api/v1/bookings/{id}/confirm | Confirm pending booking (manager/admin) |
-| POST | /api/v1/bookings/{id}/cancel | Cancel pending or confirmed booking and release stock (manager/admin) |
+| POST | /api/v1/bookings/{id}/cancel | Cancel with a reason and release stock (manager/admin) |
 
-**Example create payload:**
-
-```json
-{"enquiryId": 123, "chassis": "CHASSIS-001"}
-```
-
-**Example cancel payload:**
+**From enquiry:**
 
 ```json
-{"reason": "Customer withdrew before delivery"}
+{"enquiryId":123,"chassis":"CHASSIS-001"}
 ```
 
-Permissions: administrators can see all bookings. Branch managers see bookings associated with enquiries in their branch; salespeople see bookings for their own assigned enquiries. An authorized salesperson can create a pending booking for their own enquiry, but **only managers/admins confirm or cancel**. An inaccessible booking returns 404.
+**Direct booking:**
 
-Concurrency and safety: vehicle-row locks and PostgreSQL partial unique indexes prevent multiple live bookings for one vehicle or enquiry; invalid lifecycle transitions return HTTP 409. The inventory release endpoint refuses to free a chassis held by a live booking. Cancel the booking through the booking API instead. Do not use the generic inventory reservation endpoint for customer bookings.
+```json
+{"chassis":"CHASSIS-002","customerName":"Demo Walk-in","customerPhone":"9876543210"}
+```
 
-**Remaining work:** authoritative pricing, quotation, customer approval, deposits/refunds, reservation expiry, delivery, invoicing, GST, sale completion, and enforcing cross-module CRM stage consistency.
+The request must follow exactly one path: an `enquiryId` or direct customer fields, not both. The customer fields are required and validated for direct bookings. A booking stores a customer snapshot even when an enquiry exists so historical details remain available. Direct bookings do not affect enquiry stages. A linked booking changes the enquiry to `Booked` on confirmation and restores its previous stage on cancellation.
+
+A booking starts `PENDING` and reserves its vehicle. Authorized branch managers or administrators can confirm it to `CONFIRMED`. They can cancel pending or confirmed bookings with a reason, resulting in `CANCELLED` and releasing the chassis. A salesperson can create bookings for their own accessible enquiries or directly for a vehicle in their assigned branch, and view those bookings. The server enforces all branch and access rules; UI gating is not security.
+
+Two concurrent bookings cannot allocate the same chassis; database partial unique constraints and row locks prevent duplicate active allocations. Only one active booking per enquiry is permitted. Generic inventory release refuses to release a vehicle allocated to an active booking.
+
+**Not yet supported:** customer master/deduplication, quotation/prices, booking payment and refund, sale/delivery, invoice/GST, booking expiry, and production authentication. Use test customer data only.
 
 ## Automated tests
 
@@ -132,7 +136,7 @@ mvn test          # Controller unit/web-slice tests with mocked repositories
 mvn verify        # Unit tests + PostgreSQL Testcontainers integration tests
 ```
 
-The `BookingControllerTest`, `BookingServiceTest` and `BookingPersistenceIT` cover booking validation, state transitions, duplicate allocations, cancellation release, security and PostgreSQL persistence. The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
+The `BookingControllerTest`, `BookingServiceTest` and `BookingPersistenceIT` cover linked and direct booking creation, validation, state transitions, duplicate allocations, cancellation release, role/branch security and PostgreSQL persistence. The `InventoryPolicyTest`, `InventoryControllerTest` and `InventoryPersistenceIT` cover role policy, request validation, registration, uniqueness, reservations, transfer, receipt and movement history. The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
 
 An optional **read-only** smoke test checks an already-running API:
 
