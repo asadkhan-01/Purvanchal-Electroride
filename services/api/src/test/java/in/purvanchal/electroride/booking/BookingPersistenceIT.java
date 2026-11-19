@@ -107,6 +107,15 @@ class BookingPersistenceIT {
         Long bookingId = created.getBody().id;
         assertThat(created.getBody().status).isEqualTo("PENDING");
         assertThat(vehicles.findById(scooter.id).orElseThrow().status).isEqualTo("RESERVED");
+        assertThat(as("booking-manager").postForEntity(
+            "/api/v1/inventory/" + scooter.chassis + "/release", HttpEntity.EMPTY, String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        Vehicle otherScooter = vehicle();
+        String sameCustomerDifferentVehicle = "{\\"enquiryId\\":" + customer.id
+            + ",\\"chassis\\":\\"" + otherScooter.chassis + "\\"}";
+        assertThat(as("booking-admin").postForEntity(
+            "/api/v1/bookings", json(sameCustomerDifferentVehicle), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
 
         assertThat(as("booking-admin").postForEntity(
             "/api/v1/bookings", json(body), String.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
