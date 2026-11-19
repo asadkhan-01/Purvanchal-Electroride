@@ -71,7 +71,7 @@ Follow-up dates use ISO `YYYY-MM-DD`. Stages are `New`, `Contacted`, `Interested
 
 ## Vehicle inventory API — milestone 7
 
-The vehicle API is now persisted in PostgreSQL. The Expo **LiveInventory** screen now uses these authenticated endpoints when `EXPO_PUBLIC_API_URL` is configured; without that variable, the original inventory demo is displayed. The new screen uses its own development sign-in prompt and the same in-memory HTTP Basic transport as the CRM. The shared app-wide login session is future work.
+The vehicle API is now persisted in PostgreSQL. The Expo **LiveInventory** screen now uses these authenticated endpoints when `EXPO_PUBLIC_API_URL` is configured; without that variable, the original inventory demo is displayed. The Expo app now uses one shared development sign-in screen and the same in-memory HTTP Basic transport for CRM and Inventory. Signing out or receiving HTTP 401 clears the in-memory credentials, and a reload requires signing in again.
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -134,7 +134,7 @@ For a Codespaces browser preview:
    npx expo start --web --host localhost
    ```
 
-Restart both the backend and Expo after changing the environment. Both Expo API-backed modules now prompt for credentials and read role/branch identity from `GET /api/v1/auth/me`. Inventory can be accessed read-only by salespeople; only assigned managers and administrators can perform stock changes. Each module currently has a separate sign-in UI, so reauthentication may be needed when switching screens.
+Restart both the backend and Expo after changing the environment. The Expo app prompts once for credentials and reads role/branch identity from `GET /api/v1/auth/me`, sharing it between CRM and Inventory. Inventory can be accessed read-only by salespeople; only assigned managers and administrators can perform stock changes. Sign-out and HTTP 401 require reauthentication. Navigation between workspaces does not.
 
 **Important browser limitation:** Private Codespaces forwarded URLs can require GitHub authorization. Cross-origin `fetch` may be redirected or blocked even with API CORS enabled. If that occurs, keep ports private, return to demo mode, and use a same-origin authenticated development proxy once introduced. **Do not change port 8080 to public** to bypass this restriction.
 
