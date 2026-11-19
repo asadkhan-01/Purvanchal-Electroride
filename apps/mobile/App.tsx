@@ -1,3 +1,4 @@
+import CRM from './CRM';
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -88,14 +89,7 @@ export default function App() {
                 <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{e.name}</Text><Text style={styles.rowSub}>{e.detail}</Text></View>
                 <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
             </>}
-            {section === 'Enquiries' && <>
-              <Text style={styles.intro}>Customer leads and follow-up pipeline</Text>
-              <TextInput value={search} onChangeText={setSearch} placeholder="Search customer or city" placeholderTextColor={colors.muted} style={styles.search}/>
-              {shownEnquiries.map(e => <View key={e.name} style={styles.listRow}><View style={styles.initials}><Text style={styles.initialText}>{e.initials}</Text></View>
-                <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{e.name}</Text><Text style={styles.rowSub}>{e.detail}</Text></View>
-                <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
-              {shownEnquiries.length === 0 && <Text style={styles.empty}>No matching demo enquiries.</Text>}
-            </>}
+            {section === 'Enquiries' && <CRM />}
             {section === 'Inventory' && <>
               <Text style={styles.intro}>Chassis-level vehicle tracking across branches</Text>
               {inventory.map(v => <View key={v.id} style={styles.vehicleCard}>
