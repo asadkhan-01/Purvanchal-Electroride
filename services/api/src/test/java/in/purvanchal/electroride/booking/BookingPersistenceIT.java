@@ -41,6 +41,7 @@ class BookingPersistenceIT {
     @Autowired EnquiryRepository enquiries;
     @Autowired VehicleRepository vehicles;
     @Autowired PasswordEncoder encoder;
+    @org.springframework.boot.test.web.server.LocalServerPort int port;
 
     @BeforeEach
     void users() {
@@ -154,6 +155,9 @@ class BookingPersistenceIT {
 
     @Test
     void rejectsBranchMismatchAndMissingAuthentication() {
+        assertThat(new TestRestTemplate().getForEntity(
+            "http://localhost:" + port + "/api/v1/bookings", String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         Enquiry customer = enquiry();
         Vehicle scooter = vehicle();
         scooter.branch = "Ghazipur";
