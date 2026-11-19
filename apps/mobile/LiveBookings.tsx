@@ -4,10 +4,11 @@ import { CurrentUser, Enquiry, enquiryApi } from './api/enquiries';
 import { Vehicle, inventoryApi } from './api/inventory';
 import { Booking, BookingEvent, bookingApi } from './api/bookings';
 import { bookingPayload } from './bookingRules';
+import { BookingQuotation, quotationApi } from './api/quotations';
 
 type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
-const moneylessNote = 'Booking allocation only · Payments, price, invoice and delivery not implemented';
+const moneylessNote = 'Quotations exclude tax; no GST invoice, final payable amount or payment processing yet';
 
 function Input({ label, value, change, hint }: {
   label: string; value: string; change: (value: string) => void; hint?: string;
@@ -37,6 +38,10 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   const [selectedBooking, setSelectedBooking] = useState<number | null>(null);
   const [events, setEvents] = useState<BookingEvent[]>([]);
   const [reason, setReason] = useState('');
+  const [quotation, setQuotation] = useState<BookingQuotation | null>(null);
+  const [quoteFields, setQuoteFields] = useState({
+    vehiclePrice: '', discount: '0', accessories: '0', otherCharges: '0',
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -68,6 +73,47 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   }), [vehicles, mode, enquiry, user]);
   const managersOnly = user.role === 'ADMIN' || user.role === 'BRANCH_MANAGER';
 
+  const readQuotation = async (id: number) => {
+    try { setQuotation(await quotationApi.get(id)); }
+    catch (e) {
+      if (e instanceof Error && e.message.startsWith('API 404:')) setQuotation(null);
+      else setError(e instanceof Error ? e.message : 'Unable to load quotation');
+    }
+  };
+
+  const createQuotation = async (bookingId: number) => {
+    if (busy) return;
+    const amounts = Object.values(quoteFields);
+    if (amounts.some(value => !/^(0|[1-9]\d*)(\.\d{1,2})?$/.test(value.trim()))) {
+      setError('Enter non-negative amounts with at most two decimal places.'); return;
+    }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const created = await quotationApi.create(bookingId, {
+        vehiclePrice: Number(quoteFields.vehiclePrice),
+        discount: Number(quoteFields.discount),
+        accessories: Number(quoteFields.accessories),
+        otherCharges: Number(quoteFields.otherCharges),
+      });
+      setQuotation(created);
+      setEvents(await bookingApi.events(bookingId));
+      setNotice('Draft quotation saved');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to create quotation'); }
+    finally { setBusy(false); }
+  };
+
+  const approveQuotation = async (bookingId: number) => {
+    if (busy) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const approved = await quotationApi.approve(bookingId);
+      setQuotation(approved);
+      setEvents(await bookingApi.events(bookingId));
+      setNotice('Quotation approved');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to approve quotation'); }
+    finally { setBusy(false); }
+  };
+
   const readEvents = async (id: number) => {
     try { setEvents(await bookingApi.events(id)); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to read booking history'); }
@@ -83,6 +129,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
       ]);
       setBookings(newBookings); setEnquiries(newEnquiries); setVehicles(newVehicles);
       setSelectedBooking(changed.id); setEvents(await bookingApi.events(changed.id));
+      await readQuotation(changed.id);
       setNotice(label); setReason('');
       setChassis('');
       onClearEnquiry?.();
@@ -103,7 +150,8 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   };
 
   const viewBooking = (id: number) => {
-    setSelectedBooking(id); setEvents([]); setError(''); void readEvents(id);
+    setSelectedBooking(id); setEvents([]); setQuotation(null); setError('');
+    void readEvents(id); void readQuotation(id);
   };
 
   return <View style={s.root}>
@@ -112,7 +160,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
     <Text style={s.sub}>{user.displayName} · {user.role} · {user.branch || 'All branches'}</Text>
     <View style={s.actions}><Pressable onPress={() => void reload()} disabled={busy} style={s.secondary}>
       <Text style={s.secondaryText}>Refresh</Text></Pressable>
-      {selectedBooking != null && <Pressable onPress={() => { setSelectedBooking(null); setEvents([]); }} style={s.secondary}>
+      {selectedBooking != null && <Pressable onPress={() => { setSelectedBooking(null); setEvents([]); setQuotation(null); }} style={s.secondary}>
         <Text style={s.secondaryText}>New booking / list</Text></Pressable>}
     </View>
     {busy && <ActivityIndicator color={teal} />}
@@ -124,6 +172,32 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
       <Text style={s.info}>Source: {active.enquiryId == null ? 'Direct booking' : 'Enquiry #' + active.enquiryId}</Text>
       <Text style={s.info}>Branch: {active.branch} · Salesperson: {active.salesperson}</Text>
       <Text style={s.info}>Vehicle ID: {active.vehicleId}</Text>
+      <Text style={s.title}>Quotation · tax-exclusive estimate</Text>
+      {quotation ? <>
+        <Text style={s.info}>Status: {quotation.status} · Created by {quotation.createdBy}</Text>
+        <Text style={s.info}>Vehicle price: ₹{quotation.vehiclePrice.toFixed(2)}</Text>
+        <Text style={s.info}>Dealer discount: ₹{quotation.discount.toFixed(2)}</Text>
+        <Text style={s.info}>Accessories: ₹{quotation.accessories.toFixed(2)}</Text>
+        <Text style={s.info}>Other charges: ₹{quotation.otherCharges.toFixed(2)}</Text>
+        <Text style={s.title}>Subtotal excluding GST: ₹{quotation.subtotalExcludingTax.toFixed(2)}</Text>
+        {quotation.status === 'DRAFT' && active.status === 'PENDING' && managersOnly &&
+          <Pressable disabled={busy} style={s.primary} onPress={() => void approveQuotation(active.id)}>
+            <Text style={s.primaryText}>Approve quotation</Text>
+          </Pressable>}
+      </> : active.status === 'PENDING' ? <>
+        <Text style={s.info}>Enter indicative amounts in INR. GST, insurance, registration, subsidy and final on-road total are NOT calculated here.</Text>
+        <Input label="Vehicle price (₹) *" value={quoteFields.vehiclePrice}
+          change={vehiclePrice => setQuoteFields(prev => ({ ...prev, vehiclePrice }))} />
+        <Input label="Dealer discount (₹)" value={quoteFields.discount}
+          change={discount => setQuoteFields(prev => ({ ...prev, discount }))} />
+        <Input label="Accessories (₹)" value={quoteFields.accessories}
+          change={accessories => setQuoteFields(prev => ({ ...prev, accessories }))} />
+        <Input label="Other charges (₹)" value={quoteFields.otherCharges}
+          change={otherCharges => setQuoteFields(prev => ({ ...prev, otherCharges }))} />
+        <Pressable disabled={busy} style={s.primary} onPress={() => void createQuotation(active.id)}>
+          <Text style={s.primaryText}>Save draft quotation</Text>
+        </Pressable>
+      </> : <Text style={s.info}>No quotation was recorded before this booking progressed.</Text>}
       {active.status === 'PENDING' && managersOnly && <Pressable style={s.primary}
         disabled={busy} onPress={() => void perform(() => bookingApi.confirm(active.id), 'Booking confirmed')}>
         <Text style={s.primaryText}>Confirm booking</Text></Pressable>}
