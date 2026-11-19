@@ -5,6 +5,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import in.purvanchal.electroride.security.AppUser;
+import in.purvanchal.electroride.security.EnquiryAccess;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,15 +23,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(EnquiryController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class EnquiryControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockitoBean EnquiryRepository repository;
     @MockitoBean EnquiryActivityRepository activities;
+    @MockitoBean EnquiryAccess access;
 
     @BeforeEach
     void setup() {
-        reset(repository, activities);
+        reset(repository, activities, access);
+        AppUser admin = new AppUser();
+        admin.role = "ADMIN";
+        when(access.current(any())).thenReturn(admin);
     }
 
     private Enquiry sample(long id) {
