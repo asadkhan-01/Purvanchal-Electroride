@@ -1,5 +1,7 @@
 # Java / Maven
 **/target/
+# Explicit API build output (also matched by **/target/)
+services/api/target/
 **/.mvn/wrapper/maven-wrapper.jar
 *.class
 *.log
