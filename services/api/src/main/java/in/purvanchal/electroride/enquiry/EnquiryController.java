@@ -45,7 +45,12 @@ public class EnquiryController {
     @GetMapping
     public List<Enquiry> list(Authentication authentication) {
         AppUser user = access.current(authentication);
-        return repository.findAll().stream().filter(e -> access.canSee(user, e)).toList();
+        return switch (user.role) {
+            case "ADMIN" -> repository.findAll();
+            case "BRANCH_MANAGER" -> repository.findByBranch(user.branch);
+            case "SALESPERSON" -> repository.findByBranchAndSalesperson(user.branch, user.displayName);
+            default -> List.of();
+        };
     }
 
     @GetMapping("/{id}")
