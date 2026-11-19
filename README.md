@@ -73,6 +73,18 @@ node scripts/dev-proxy.mjs                                      # port 3000: /ba
 
 Start Spring Boot and Expo as above (no `APP_CORS_ALLOWED_ORIGIN` needed), then open port **3000**. Keep it private.
 
+### Public test deployment (Render)
+
+The root `Dockerfile` builds one image: the Expo web app is exported with `EXPO_PUBLIC_API_URL=/` and served by Spring Boot, so UI and API share one HTTPS origin (no CORS). `render.yaml` adds a PostgreSQL database.
+
+1. In Render: **New → Blueprint**, connect this GitHub repository and select the branch.
+2. When prompted, enter a unique `BOOTSTRAP_ADMIN_PASSWORD` (12+ characters). It is stored only in Render.
+3. After deploy, open `https://<service>.onrender.com`, sign in as `admin`, and create manager/salesperson accounts in the **Users** tab.
+
+Free-tier notes: the service sleeps after ~15 minutes idle (first request then takes about a minute), and the free database expires after 30 days. **Test data only:** HTTP Basic development authentication is publicly reachable on this URL and is not production-ready.
+
+To build locally: `docker build -t electroride .` then run it with `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` and the bootstrap variables.
+
 ### Codespaces phone preview (private forwarding)
 
 To automatically configure the ignored Expo `.env.local` with the current Codespace's private HTTPS API URL (port 8080), run from the repository root:

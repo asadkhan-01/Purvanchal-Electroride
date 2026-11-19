@@ -3,6 +3,7 @@ package in.purvanchal.electroride.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -45,9 +46,15 @@ public class SecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                // Bundled Expo web build (only present in the single-service Docker image).
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.ico", "/metadata.json",
+                    "/_expo/**", "/assets/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
                 .anyRequest().authenticated())
-            .httpBasic(Customizer.withDefaults())
+            // Plain 401 without a WWW-Authenticate challenge, so browsers (notably iOS Safari) do not
+            // show a native login dialog over the app's own sign-in screen.
+            .httpBasic(basic -> basic.authenticationEntryPoint(
+                (request, response, ex) -> response.sendError(HttpStatus.UNAUTHORIZED.value())))
             .formLogin(form -> form.disable())
             .build();
     }
