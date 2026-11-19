@@ -5,6 +5,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import org.springframework.http.*;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -31,9 +35,10 @@ class EnquiryPersistenceIT {
     }
 
     @Autowired TestRestTemplate rest;
+    @LocalServerPort int port;
 
     @Test
-    void createReadUpdateAndListArePersisted() {
+    void createReadUpdateAndListArePersisted() throws Exception {
         String payload = """
             {"customerName":"Integration Test","phone":"9876500000",
              "branch":"Varanasi","salesperson":"Aman","source":"Walk-in",
@@ -52,8 +57,12 @@ class EnquiryPersistenceIT {
         assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fetched.getBody().customerName).isEqualTo("Integration Test");
 
-        rest.exchange("/api/v1/enquiries/" + id + "/stage", HttpMethod.PATCH,
-            new HttpEntity<>("{\"stage\":\"Interested\"}", headers), Enquiry.class);
+        HttpResponse<String> changed = HttpClient.newHttpClient().send(
+            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/stage"))
+                .header("Content-Type", "application/json")
+                .method("PATCH", HttpRequest.BodyPublishers.ofString("{\\"stage\\":\\"Interested\\"}"))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(changed.statusCode()).isEqualTo(200);
         Enquiry updated = rest.getForObject("/api/v1/enquiries/" + id, Enquiry.class);
         assertThat(updated.stage).isEqualTo("Interested");
 
