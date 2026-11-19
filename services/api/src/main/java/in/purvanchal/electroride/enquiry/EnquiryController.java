@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import in.purvanchal.electroride.security.AppUser;
+import in.purvanchal.electroride.security.EnquiryAccess;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,10 +19,12 @@ import java.util.List;
 public class EnquiryController {
     private final EnquiryRepository repository;
     private final EnquiryActivityRepository activities;
+    private final EnquiryAccess access;
 
-    public EnquiryController(EnquiryRepository repository, EnquiryActivityRepository activities) {
+    public EnquiryController(EnquiryRepository repository, EnquiryActivityRepository activities, EnquiryAccess access) {
         this.repository = repository;
         this.activities = activities;
+        this.access = access;
     }
 
     public record CreateEnquiry(
@@ -38,16 +43,22 @@ public class EnquiryController {
     public record CreateActivity(@NotBlank @Size(max = 2000) String message) {}
 
     @GetMapping
-    public List<Enquiry> list() { return repository.findAll(); }
+    public List<Enquiry> list(Authentication authentication) {
+        AppUser user = access.current(authentication);
+        return repository.findAll().stream().filter(e -> access.canSee(user, e)).toList();
+    }
 
     @GetMapping("/{id}")
-    public Enquiry get(@PathVariable Long id) {
-        return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enquiry not found"));
+    public Enquiry get(@PathVariable Long id, Authentication authentication) {
+        Enquiry enquiry = repository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enquiry not found"));
+        access.requireAccess(access.current(authentication), enquiry);
+        return enquiry;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Enquiry create(@Valid @RequestBody CreateEnquiry input) {
+    public Enquiry create(@Valid @RequestBody CreateEnquiry input, Authentication authentication) {
         Enquiry e = new Enquiry();
         e.customerName = input.customerName().trim();
         e.phone = input.phone();
@@ -57,19 +68,20 @@ public class EnquiryController {
         e.interestedModel = input.interestedModel().trim();
         e.followUpDate = input.followUpDate();
         e.notes = input.notes();
+        access.validateNew(access.current(authentication), e);
         return repository.save(e);
     }
 
     @GetMapping("/{id}/activities")
-    public List<EnquiryActivity> listActivities(@PathVariable Long id) {
-        get(id);
+    public List<EnquiryActivity> listActivities(@PathVariable Long id, Authentication authentication) {
+        get(id, authentication);
         return activities.findByEnquiryIdOrderByCreatedAtDescIdDesc(id);
     }
 
     @PostMapping("/{id}/activities")
     @ResponseStatus(HttpStatus.CREATED)
-    public EnquiryActivity addActivity(@PathVariable Long id, @Valid @RequestBody CreateActivity input) {
-        get(id);
+    public EnquiryActivity addActivity(@PathVariable Long id, @Valid @RequestBody CreateActivity input, Authentication authentication) {
+        get(id, authentication);
         EnquiryActivity activity = new EnquiryActivity();
         activity.enquiryId = id;
         activity.message = input.message().trim();
@@ -78,11 +90,11 @@ public class EnquiryController {
 
     @Transactional
     @PatchMapping("/{id}/follow-up")
-    public Enquiry scheduleFollowUp(@PathVariable Long id, @Valid @RequestBody FollowUpRequest input) {
+    public Enquiry scheduleFollowUp(@PathVariable Long id, @Valid @RequestBody FollowUpRequest input, Authentication authentication) {
         if (input.followUpDate() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Follow-up date is required");
         }
-        Enquiry enquiry = get(id);
+        Enquiry enquiry = get(id, authentication);
         enquiry.followUpDate = input.followUpDate();
         Enquiry saved = repository.save(enquiry);
         EnquiryActivity activity = new EnquiryActivity();
@@ -94,11 +106,11 @@ public class EnquiryController {
 
     @Transactional
     @PatchMapping("/{id}/stage")
-    public Enquiry changeStage(@PathVariable Long id, @Valid @RequestBody UpdateStage input) {
+    public Enquiry changeStage(@PathVariable Long id, @Valid @RequestBody UpdateStage input, Authentication authentication) {
         if (!List.of("New", "Contacted", "Interested", "Booked", "Lost").contains(input.stage())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid stage");
         }
-        Enquiry e = get(id);
+        Enquiry e = get(id, authentication);
         e.stage = input.stage();
         Enquiry saved = repository.save(e);
         EnquiryActivity event = new EnquiryActivity();
