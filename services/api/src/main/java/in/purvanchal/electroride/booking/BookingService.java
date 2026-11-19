@@ -42,9 +42,8 @@ public class BookingService {
         if ("ADMIN".equals(actor.role)) return bookings.findAll();
         if (actor.branch == null) return List.of();
         // Use enquiry ownership, not booking creator, for salesperson visibility.
-        return bookings.findByBranch(actor.branch).stream().filter(booking ->
-            enquiries.findById(booking.enquiryId)
-                .map(enquiry -> enquiryAccess.canSee(actor, enquiry)).orElse(false)).toList();
+        return bookings.findByBranch(actor.branch).stream()
+            .filter(booking -> canSee(actor, booking)).toList();
     }
 
     public Booking get(Long id, AppUser actor) {
@@ -82,6 +81,9 @@ public class BookingService {
         booking.branch = vehicle.branch;
         booking.status = "PENDING";
         booking.priorEnquiryStage = enquiry.stage;
+        booking.customerName = enquiry.customerName;
+        booking.customerPhone = enquiry.phone;
+        booking.salesperson = enquiry.salesperson;
         booking.createdBy = actor.username;
         Booking saved;
         try {
@@ -93,6 +95,50 @@ public class BookingService {
         vehicles.save(vehicle);
         logMovement(vehicle, "RESERVED_FOR_BOOKING", actor.username);
         logEvent(saved, "CREATED", actor.username, normalized);
+        return saved;
+    }
+
+
+    @Transactional
+    public Booking createDirect(String chassis, String name, String phone, AppUser actor) {
+        if (name == null || name.isBlank() || name.trim().length() > 160
+                || phone == null || !phone.matches("[0-9]{10}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valid customer name and 10-digit phone required");
+        }
+        String normalized = chassis.trim().toUpperCase(Locale.ROOT);
+        Vehicle vehicle = vehicles.lockByChassis(normalized).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
+        inventoryPolicy.requireView(actor, vehicle);
+        // Only an authorized salesperson/manager may create a booking in their branch.
+        if (!"ADMIN".equals(actor.role)
+                && (!List.of("SALESPERSON", "BRANCH_MANAGER").contains(actor.role)
+                    || actor.branch == null || !actor.branch.equals(vehicle.branch))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Outside assigned branch");
+        }
+        if (!"AVAILABLE".equals(vehicle.status))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle is not available for booking");
+        if (bookings.existsByVehicleIdAndStatusIn(vehicle.id, LIVE))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle already has a live booking");
+
+        Booking booking = new Booking();
+        booking.vehicleId = vehicle.id;
+        booking.branch = vehicle.branch;
+        booking.customerName = name.trim();
+        booking.customerPhone = phone;
+        booking.salesperson = actor.displayName;
+        booking.createdBy = actor.username;
+        booking.status = "PENDING";
+        // Direct bookings deliberately have no enquiry and no prior CRM stage.
+        Booking saved;
+        try {
+            saved = bookings.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException duplicate) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle already has a live booking");
+        }
+        vehicle.status = "RESERVED";
+        vehicles.save(vehicle);
+        logMovement(vehicle, "RESERVED_FOR_BOOKING", actor.username);
+        logEvent(saved, "CREATED_DIRECT", actor.username, normalized);
         return saved;
     }
 
@@ -108,9 +154,11 @@ public class BookingService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Reserved vehicle is no longer available");
         booking.status = "CONFIRMED";
         booking.confirmedBy = actor.username;
-        Enquiry enquiry = enquiries.findById(booking.enquiryId).orElseThrow(() -> missing());
-        enquiry.stage = "Booked";
-        enquiries.save(enquiry);
+        if (booking.enquiryId != null) {
+            Enquiry enquiry = enquiries.findById(booking.enquiryId).orElseThrow(() -> missing());
+            enquiry.stage = "Booked";
+            enquiries.save(enquiry);
+        }
         logEvent(booking, "CONFIRMED", actor.username, null);
         return bookings.save(booking);
     }
@@ -133,18 +181,30 @@ public class BookingService {
         vehicle.status = "AVAILABLE";
         vehicles.save(vehicle);
         logMovement(vehicle, "BOOKING_CANCELLED_RELEASED", actor.username);
-        Enquiry enquiry = enquiries.findById(booking.enquiryId).orElseThrow(() -> missing());
-        if ("Booked".equals(enquiry.stage)) {
-            enquiry.stage = booking.priorEnquiryStage;
-            enquiries.save(enquiry);
+        if (booking.enquiryId != null) {
+            Enquiry enquiry = enquiries.findById(booking.enquiryId).orElseThrow(() -> missing());
+            if ("Booked".equals(enquiry.stage)) {
+                enquiry.stage = booking.priorEnquiryStage;
+                enquiries.save(enquiry);
+            }
         }
         logEvent(booking, "CANCELLED", actor.username, booking.cancellationReason);
         return bookings.save(booking);
     }
 
+    private boolean canSee(AppUser actor, Booking booking) {
+        if ("ADMIN".equals(actor.role)) return true;
+        if (actor.branch == null || !actor.branch.equals(booking.branch)) return false;
+        if (booking.enquiryId != null) {
+            return enquiries.findById(booking.enquiryId)
+                .map(enquiry -> enquiryAccess.canSee(actor, enquiry)).orElse(false);
+        }
+        return "BRANCH_MANAGER".equals(actor.role)
+            || ("SALESPERSON".equals(actor.role) && actor.displayName.equals(booking.salesperson));
+    }
+
     private void requireAccess(AppUser actor, Booking booking) {
-        Enquiry enquiry = enquiries.findById(booking.enquiryId).orElseThrow(() -> missing());
-        enquiryAccess.requireAccess(actor, enquiry);
+        if (!canSee(actor, booking)) throw missing();
     }
 
     private void logEvent(Booking booking, String event, String actor, String detail) {
