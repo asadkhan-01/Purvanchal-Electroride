@@ -21,6 +21,36 @@ export type NewEnquiry = Pick<Enquiry,
   'customerName' | 'phone' | 'branch' | 'salesperson' | 'source' | 'interestedModel' | 'notes'> &
   { followUpDate: string | null };
 
+export type CurrentUser = {
+  username: string;
+  displayName: string;
+  role: 'ADMIN' | 'BRANCH_MANAGER' | 'SALESPERSON';
+  branch: string | null;
+};
+
+// Credentials are intentionally kept only in application memory and cleared on logout.
+// Development-only Basic authentication; must be replaced for production use.
+let authorization: string | null = null;
+function encodeAsciiBase64(value: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let result = '';
+  for (let i = 0; i < value.length; i += 3) {
+    const a = value.charCodeAt(i), hasB = i + 1 < value.length, hasC = i + 2 < value.length;
+    const b = hasB ? value.charCodeAt(i + 1) : 0;
+    const c = hasC ? value.charCodeAt(i + 2) : 0;
+    result += alphabet[a >> 2] + alphabet[((a & 3) << 4) | (b >> 4)]
+      + (hasB ? alphabet[((b & 15) << 2) | (c >> 6)] : '=')
+      + (hasC ? alphabet[c & 63] : '=');
+  }
+  return result;
+}
+export function setLoginCredentials(username: string, password: string) {
+  const pair = username + ':' + password;
+  if (!/^[\x20-\x7E]+$/.test(pair)) throw new Error('Use ASCII characters for development credentials.');
+  authorization = 'Basic ' + encodeAsciiBase64(pair);
+}
+export function clearLoginCredentials() { authorization = null; }
+
 export const apiUrl = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 export const apiConfigured = apiUrl.startsWith('https://') || apiUrl.startsWith('http://localhost:');
 
@@ -28,7 +58,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!apiConfigured) throw new Error('API URL not configured');
   const response = await fetch(apiUrl + path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authorization ? { Authorization: authorization } : {}),
+      ...(init?.headers || {}),
+    },
   });
   if (!response.ok) {
     const error = await response.text().catch(() => '');
@@ -38,6 +72,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const enquiryApi = {
+  me: () => request<CurrentUser>('/api/v1/auth/me'),
   list: () => request<Enquiry[]>('/api/v1/enquiries'),
   create: (data: NewEnquiry) => request<Enquiry>('/api/v1/enquiries', { method: 'POST', body: JSON.stringify(data) }),
   stage: (id: number, stage: Stage) => request<Enquiry>('/api/v1/enquiries/' + id + '/stage', { method: 'PATCH', body: JSON.stringify({ stage }) }),
