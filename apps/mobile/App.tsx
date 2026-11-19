@@ -79,7 +79,7 @@ export default function App() {
             <View style={styles.avatar}><Text style={styles.avatarText}>{session ? session.displayName.slice(0, 2).toUpperCase() : 'PE'}</Text></View>
           </View>
           <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard, Sales and Finance use demo data. Enquiries and Inventory use persistent APIs when configured and signed in.</Text></View>
+            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard and Finance use demo data. CRM, Inventory and Sales/Bookings use persistent APIs when configured and signed in.</Text></View>
             {apiConfigured && !session ? <SessionGate user={session} onSignIn={setSession} /> : <>
             {section === 'Overview' && <>
               <View style={[styles.hero, wide && { flexDirection: 'row', alignItems: 'center' }]}>
