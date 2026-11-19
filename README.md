@@ -2,13 +2,13 @@
 
 A multi-branch electric-vehicle dealership management system for new EVs, targeting approximately 3–5 branches.
 
-> **Development status:** The Expo dashboard, enquiry CRM and vehicle inventory previews exist. The Spring Boot API supports PostgreSQL-backed enquiries and chassis-level inventory, with development-only database-backed authentication and branch-scoped access. The Expo inventory screen, sales and finance are still demo screens. **No real customer or financial data should be used yet.**
+> **Development status:** The Expo dashboard, enquiry CRM and vehicle inventory interfaces exist. The Spring Boot API supports PostgreSQL-backed enquiries and chassis-level inventory, with development-only database-backed authentication and branch-scoped access. Enquiries and Inventory use persistent APIs when configured; sales and finance remain demo screens. **No real customer or financial data should be used yet.**
 
 ## Architecture
 
 | Layer | Technology | Status |
 |---|---|---|
-| Mobile and web preview | Expo SDK 58, React Native, TypeScript | Dashboard, demo inventory and CRM |
+| Mobile and web preview | Expo SDK 58, React Native, TypeScript | Dashboard and opt-in API-backed CRM and inventory |
 | API | Java 21, Spring Boot 3.5 | CRM and vehicle inventory endpoints |
 | Database | PostgreSQL 16 + Flyway | Enquiries, activities, users, vehicles and movements |
 | Integration tests | JUnit 5, Spring Boot Test, Testcontainers | CRM, security and inventory lifecycle tests |
@@ -62,13 +62,16 @@ npx expo start --web --host localhost
 
 Open the forwarded **8081** port in Codespaces. The web preview works in demo mode without backend configuration.
 
-### Optional API-backed CRM
+### Optional API-backed CRM and Inventory
 
-The new `LiveCRM.tsx` screen calls the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. This is an **opt-in development preview** that now prompts for a username and password. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
+The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. Each live screen currently has its own development sign-in prompt, using the shared in-memory HTTP Basic authentication transport; changing modules may require signing in again. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** that prompts for a username and password. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
 
 See **[API setup, endpoint details and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
 
-## Run automated backend tests
+## Automated tests
+
+Backend tests:
+
 
 ```bash
 cd services/api
@@ -76,7 +79,16 @@ mvn test      # Controller tests
 mvn verify    # Controller + isolated PostgreSQL integration tests
 ```
 
-GitHub Actions runs the backend tests when backend files change and also typechecks the Expo app when mobile files change. These checks must pass before treating new functionality as verified.
+Expo frontend unit tests and TypeScript checks:
+
+```bash
+cd apps/mobile
+npm ci
+npm run typecheck
+npm test
+```
+
+GitHub Actions runs backend tests when backend files change and both TypeScript checks and frontend unit tests when mobile files change. These checks must pass before treating new functionality as verified.
 
 ## Development milestones
 
@@ -86,9 +98,9 @@ GitHub Actions runs the backend tests when backend files change and also typeche
 4. **Done — Backend foundation:** Spring Boot, Flyway, PostgreSQL and first API endpoints.
 5. **Implemented, verification pending — Persistent CRM:** API-backed enquiry list, creation, activity history, stage changes and follow-ups, with automated tests.
 6. **Implemented, verification pending — Development security:** database-backed users, admin provisioning, HTTP Basic login, enforced server-side CRM branch/salesperson visibility and automated role tests.
-7. **Implemented, verification pending — Inventory backend:** persistent chassis and component serials, reservation, branch transfer, receipt, movement history and server-side branch enforcement. The Expo inventory screen still uses in-memory demo data.
-8. **Next — Inventory UI integration:** wire the Expo inventory screen into the authenticated API.
-9. **Later — Sales, finance, accounting, GST and deployment.**
+7. **Backend CI verified — Inventory backend:** persistent chassis and component serials, reservation, branch transfer, receipt, movement history and server-side branch enforcement.
+8. **Implemented, new CI verification pending — Inventory UI integration:** API-connected inventory with role-aware controls and automated frontend rule tests; demo fallback remains.
+9. **Next — Shared authenticated app session and production-hardening roadmap**, followed by sales, finance, accounting, GST and deployment.
 
 ## Safety and compliance
 
