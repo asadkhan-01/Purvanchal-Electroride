@@ -48,3 +48,31 @@ test('invalid development credentials never replace an existing logged-in sessio
   clearLoginCredentials();
   assert.throws(() => setLoginCredentials('admin', 'nonascii-£'), /ASCII/);
 });
+
+test('401 clears credentials and notifies the app session gate', async () => {
+  const original = globalThis.fetch;
+  const { setUnauthorizedHandler } = await import('../api/enquiries.ts');
+  let expired = 0;
+  let auth;
+  setUnauthorizedHandler(() => { expired++; });
+  globalThis.fetch = async (_url, options) => {
+    auth = options.headers.Authorization;
+    return { ok: false, status: 401, text: async () => 'Unauthorized' };
+  };
+  try {
+    setLoginCredentials('admin', 'test-password-123');
+    await assert.rejects(request('/api/v1/inventory'), /API 401/);
+    assert.ok(auth?.startsWith('Basic '));
+    assert.equal(expired, 1);
+    globalThis.fetch = async (_url, options) => {
+      auth = options.headers.Authorization;
+      return { ok: true, json: async () => [] };
+    };
+    await request('/api/v1/inventory');
+    assert.equal(auth, undefined);
+  } finally {
+    clearLoginCredentials();
+    setUnauthorizedHandler(null);
+    globalThis.fetch = original;
+  }
+});
