@@ -97,6 +97,7 @@ class EnquiryPersistenceIT {
         HttpResponse<String> activityResponse = HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/activities"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", basicAuth())
                 .POST(HttpRequest.BodyPublishers.ofString("""
                     {"message":"Called to confirm interest"}
                     """))
@@ -107,6 +108,7 @@ class EnquiryPersistenceIT {
         HttpResponse<String> followUpResponse = HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/follow-up"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", basicAuth())
                 .method("PATCH", HttpRequest.BodyPublishers.ofString("""
                     {"followUpDate":"2026-12-05"}
                     """))
