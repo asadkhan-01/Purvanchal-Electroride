@@ -1,6 +1,7 @@
 package in.purvanchal.electroride.inventory;
 
 import in.purvanchal.electroride.security.AppUser;
+import in.purvanchal.electroride.booking.BookingRepository;
 import in.purvanchal.electroride.security.EnquiryAccess;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ class InventoryControllerTest {
     @MockitoBean VehicleMovementRepository movements;
     @MockitoBean EnquiryAccess access;
     @MockitoBean InventoryPolicy policy;
+    @MockitoBean BookingRepository bookings;
 
     @Test void registrationRejectsMissingSerialNumbers() throws Exception {
         mvc.perform(post("/api/v1/inventory")
@@ -67,4 +69,21 @@ class InventoryControllerTest {
         mvc.perform(post("/api/v1/inventory/CH-1/reserve")).andExpect(status().isConflict());
         verify(vehicles, never()).save(any());
     }
+    @Test void bookingAllocatedVehicleCannotBeReleasedDirectly() throws Exception {
+        Vehicle vehicle = new Vehicle();
+        vehicle.id = 41L;
+        vehicle.chassis = "CH-BOOKED";
+        vehicle.branch = "Varanasi";
+        vehicle.status = "RESERVED";
+        when(vehicles.lockByChassis("CH-BOOKED")).thenReturn(Optional.of(vehicle));
+        AppUser manager = new AppUser();
+        manager.username = "manager";
+        when(access.current(any())).thenReturn(manager);
+        when(bookings.existsByVehicleIdAndStatusIn(eq(41L), anyList())).thenReturn(true);
+        mvc.perform(post("/api/v1/inventory/CH-BOOKED/release"))
+            .andExpect(status().isConflict());
+        verify(vehicles, never()).save(any());
+        verifyNoInteractions(movements);
+    }
+
 }
