@@ -101,7 +101,6 @@ class BookingServiceTest {
         booking.branch = "Varanasi";
         booking.status = "CONFIRMED";
         when(bookings.lockById(15L)).thenReturn(Optional.of(booking));
-        when(enquiries.findById(1L)).thenReturn(Optional.of(enquiry));
         assertThatThrownBy(() -> service.confirm(15L, actor))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
@@ -116,7 +115,6 @@ class BookingServiceTest {
         booking.branch = "Varanasi";
         booking.status = "CANCELLED";
         when(bookings.lockById(15L)).thenReturn(Optional.of(booking));
-        when(enquiries.findById(1L)).thenReturn(Optional.of(enquiry));
         assertThatThrownBy(() -> service.cancel(15L, "Duplicated", actor))
             .isInstanceOfSatisfying(ResponseStatusException.class,
                 ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
