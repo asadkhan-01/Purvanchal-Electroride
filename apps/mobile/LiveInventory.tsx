@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { CurrentUser, enquiryApi, setLoginCredentials, clearLoginCredentials } from './api/enquiries';
+import { CurrentUser } from './api/enquiries';
 import { NewVehicle, Vehicle, VehicleMovement, inventoryApi } from './api/inventory';
 import { allowedAction, canManageBranch, isRegistrationComplete } from './inventoryRules';
 
@@ -24,10 +24,7 @@ function Options({ values, value, onSelect }: { values: readonly string[]; value
     style={[s.option, v === value && s.active]}><Text style={[s.optionText, v === value && s.activeText]}>{v}</Text>
   </Pressable>)}</View>;
 }
-export default function LiveInventory() {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+export default function LiveInventory({ user }: { user: CurrentUser }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [movements, setMovements] = useState<VehicleMovement[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<string | null>(null);
@@ -53,9 +50,9 @@ export default function LiveInventory() {
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load movements'); }
   }, []);
 
-  useEffect(() => { if (user) void refresh(); }, [user, refresh]);
+  useEffect(() => { void refresh(); }, [user.username, refresh]);
   useEffect(() => {
-    if (selectedChassis && user) void loadMovements(selectedChassis);
+    if (selectedChassis) void loadMovements(selectedChassis);
     else setMovements([]);
   }, [selectedChassis, user, loadMovements]);
 
@@ -66,26 +63,6 @@ export default function LiveInventory() {
     return matchesQuery && (branchFilter === 'All' || v.branch === branchFilter)
       && (statusFilter === 'All' || v.status === statusFilter);
   }), [vehicles, query, branchFilter, statusFilter]);
-
-  const login = async () => {
-    setBusy(true); setError('');
-    try {
-      setLoginCredentials(username.trim(), password);
-      const identity = await enquiryApi.me();
-      setUser(identity);
-      setPassword('');
-      setDraft({ ...blank, branch: identity.branch || 'Varanasi' });
-    } catch (e) {
-      clearLoginCredentials();
-      setError(e instanceof Error ? e.message : 'Sign-in failed');
-    } finally { setBusy(false); }
-  };
-
-  const logout = () => {
-    clearLoginCredentials();
-    setUser(null); setVehicles([]); setMovements([]); setSelectedChassis(null); setAdding(false);
-    setUsername(''); setPassword(''); setError(''); setNotice('');
-  };
 
   const perform = async (operation: () => Promise<Vehicle>, success: string) => {
     if (busy) return;
@@ -133,23 +110,11 @@ export default function LiveInventory() {
     }
   };
 
-  if (!user) return <View style={s.root}>
-    <View style={s.banner}><Text style={s.bannerText}>DEVELOPMENT LOGIN · HTTPS and test credentials only. Inventory operations will update PostgreSQL.</Text></View>
-    <Text style={s.heading}>Sign in to inventory</Text>
-    <Text style={s.sub}>Use the development account configured in the Spring Boot backend.</Text>
-    {!!error && <Text style={s.error}>{error}</Text>}
-    <Field label="Username" value={username} onChange={setUsername} />
-    <Field label="Password" value={password} onChange={setPassword} secure />
-    <Pressable disabled={busy || !username.trim() || !password} style={s.button} onPress={() => void login()}>
-      <Text style={s.buttonText}>{busy ? 'Signing in...' : 'Sign in'}</Text></Pressable>
-  </View>;
-
   return <View style={s.root}>
     <View style={s.banner}><Text style={s.bannerText}>API INVENTORY · Persistent records · Development-only authentication. Use synthetic vehicle data.</Text></View>
     <Text style={s.heading}>Vehicle inventory</Text>
     <Text style={s.sub}>{user.displayName} · {user.role} · {user.branch || 'All branches'}</Text>
     <View style={s.actions}>
-      <Pressable onPress={logout} style={s.lightButton}><Text style={s.lightText}>Sign out</Text></Pressable>
       <Pressable disabled={busy} onPress={() => void refresh()} style={s.lightButton}><Text style={s.lightText}>Refresh</Text></Pressable>
     </View>
     {!!error && <Text style={s.error}>{error}</Text>}
