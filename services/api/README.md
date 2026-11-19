@@ -1,12 +1,12 @@
-# Electroride API — development only
+# Purvanchal Electroride API
 
-Java 21 + Spring Boot 3.5 + PostgreSQL 16 + Flyway.
+Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Flyway
 
-**Not production ready:** endpoints have no authentication or branch-level authorisation yet. Do not expose port 8080 publicly or use real customer data.
+**Development only.** The API currently has **no authentication or server-enforced branch access**. Never expose it to the public internet or use real customer information.
 
-## Start in Codespaces
+## Start in GitHub Codespaces
 
-From the repository root:
+From repository root:
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
@@ -14,56 +14,75 @@ cd services/api
 mvn spring-boot:run
 ```
 
-If `mvn` is unavailable, install Maven in the Codespace or add a Maven wrapper.
+The server uses port 8080 and reads PostgreSQL connection settings from `DB_URL`, `DB_USER`, and `DB_PASSWORD`. Default credentials are local development placeholders only.
 
-In another terminal:
+Database migrations run automatically at startup:
 
-```bash
-curl http://localhost:8080/actuator/health
-curl http://localhost:8080/api/v1/enquiries
-curl -X POST http://localhost:8080/api/v1/enquiries \
-  -H 'Content-Type: application/json' \
-  -d '{"customerName":"Demo Customer","phone":"9876500000","branch":"Varanasi","salesperson":"Aman","source":"Walk-in","interestedModel":"Electric Scooter"}'
-```
+- `V1__create_enquiries.sql` — enquiries
+- `V2__create_enquiry_activities.sql` — append-only enquiry activity messages
 
-## Current scope
+## CRM endpoints
 
-- PostgreSQL persistence for enquiries
-- Flyway V1 migration
-- GET /api/v1/enquiries
-- GET /api/v1/enquiries/{id}
-- POST /api/v1/enquiries
-- PATCH /api/v1/enquiries/{id}/stage
+| Method | Route | Purpose |
+|---|---|---|
+| GET | /api/v1/enquiries | List enquiries |
+| GET | /api/v1/enquiries/{id} | Read enquiry |
+| POST | /api/v1/enquiries | Create enquiry |
+| PATCH | /api/v1/enquiries/{id}/stage | Change stage and record an activity |
+| PATCH | /api/v1/enquiries/{id}/follow-up | Set a follow-up date and record an activity |
+| GET | /api/v1/enquiries/{id}/activities | Read activity history |
+| POST | /api/v1/enquiries/{id}/activities | Add activity or call outcome |
+
+Follow-up dates use ISO `YYYY-MM-DD`. Stages are `New`, `Contacted`, `Interested`, `Booked` or `Lost`.
 
 ## Automated tests
 
-The test suite is checked into `src/test/java`.
-
-- `EnquiryControllerTest`: isolated MVC tests with a mocked repository, covering list, create, validation, stage update and 404 responses.
-- `EnquiryPersistenceIT`: real HTTP requests to a Spring Boot test server backed by an ephemeral PostgreSQL 16 Testcontainers instance. Flyway migrations run automatically.
-- `EnquiryLiveSmokeIT`: optional, read-only checks against the already-running backend.
-
-Run unit tests without stopping your running API:
-
 ```bash
 cd services/api
-mvn test
+mvn test          # Controller unit/web-slice tests with mocked repositories
+mvn verify        # Unit tests + PostgreSQL Testcontainers integration tests
 ```
 
-Run unit and PostgreSQL integration tests (requires Docker in Codespaces):
+The `EnquiryPersistenceIT` suite starts its **own ephemeral PostgreSQL container** and exercises full create, read, stage, follow-up and activity-history operations. It never uses the development database.
 
-```bash
-mvn verify
-```
-
-Run only the read-only live smoke test against your running API:
+An optional **read-only** smoke test checks an already-running API:
 
 ```bash
 RUN_LIVE_SMOKE=true mvn -Dit.test=EnquiryLiveSmokeIT failsafe:integration-test failsafe:verify
 ```
 
-Integration tests do **not** use the development PostgreSQL database. Live smoke tests do **not** create or modify records.
+GitHub Actions runs `mvn clean verify` on backend changes.
 
-## Before any real usage
+## Connecting the Expo web preview (development only)
 
-Implement authentication, branch-scoped authorization, audit logging, activity/follow-up tables, request limits, CORS configuration, error handling, tests, backups and secure secrets. The Expo CRM screen still uses in-memory demo data and is **not** connected to this API.
+The Expo CRM screen uses the API only when `EXPO_PUBLIC_API_URL` is configured; otherwise it stays in local demo mode.
+
+For a Codespaces browser preview:
+
+1. Run the API on port 8080 and the Expo web preview on port 8081.
+2. In Codespaces **Ports**, copy the HTTPS forwarded URL for **8080** (the API) and **8081** (the Expo page). Keep both ports private.
+3. From `apps/mobile`, create ignored `.env.local` with:
+
+   ```env
+   EXPO_PUBLIC_API_URL=https://YOUR-CODESPACE-8080.app.github.dev
+   ```
+
+4. Start the API with an explicit, exact web origin in `APP_CORS_ALLOWED_ORIGIN` (no path or trailing slash):
+
+   ```bash
+   APP_CORS_ALLOWED_ORIGIN=https://YOUR-CODESPACE-8081.app.github.dev mvn spring-boot:run
+   ```
+
+5. Restart Expo so it picks up the environment variable:
+
+   ```bash
+   npx expo start --web --host localhost
+   ```
+
+**Important browser limitation:** Private Codespaces forwarded URLs can require GitHub authorization. Cross-origin `fetch` may be redirected or blocked even with API CORS enabled. If that occurs, keep ports private, return to demo mode, and use a same-origin authenticated development proxy once introduced. **Do not change port 8080 to public** to bypass this restriction.
+
+Any variable prefixed `EXPO_PUBLIC_` is embedded in the client bundle. It must **never** contain passwords, tokens or private secrets.
+
+## Pending before production
+
+Authentication, proper branch-scoped authorization, activity author attribution, transaction boundaries for all mutations, CORS policy, server-side paging and filtering, API error handling, rate limits, audit logging, encrypted backups, security testing and API tests for role permissions.
