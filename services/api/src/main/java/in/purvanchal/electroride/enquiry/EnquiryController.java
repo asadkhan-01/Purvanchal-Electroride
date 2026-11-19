@@ -3,6 +3,7 @@ package in.purvanchal.electroride.enquiry;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -13,7 +14,12 @@ import java.util.List;
 @RequestMapping("/api/v1/enquiries")
 public class EnquiryController {
     private final EnquiryRepository repository;
-    public EnquiryController(EnquiryRepository repository) { this.repository = repository; }
+    private final EnquiryActivityRepository activities;
+
+    public EnquiryController(EnquiryRepository repository, EnquiryActivityRepository activities) {
+        this.repository = repository;
+        this.activities = activities;
+    }
 
     public record CreateEnquiry(
         @NotBlank String customerName,
@@ -27,6 +33,8 @@ public class EnquiryController {
     ) {}
 
     public record UpdateStage(@NotBlank String stage) {}
+    public record FollowUpRequest(LocalDate followUpDate) {}
+    public record CreateActivity(@NotBlank @Size(max = 2000) String message) {}
 
     @GetMapping
     public List<Enquiry> list() { return repository.findAll(); }
@@ -49,6 +57,37 @@ public class EnquiryController {
         e.followUpDate = input.followUpDate();
         e.notes = input.notes();
         return repository.save(e);
+    }
+
+    @GetMapping("/{id}/activities")
+    public List<EnquiryActivity> listActivities(@PathVariable Long id) {
+        get(id);
+        return activities.findByEnquiryIdOrderByCreatedAtDescIdDesc(id);
+    }
+
+    @PostMapping("/{id}/activities")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EnquiryActivity addActivity(@PathVariable Long id, @Valid @RequestBody CreateActivity input) {
+        get(id);
+        EnquiryActivity activity = new EnquiryActivity();
+        activity.enquiryId = id;
+        activity.message = input.message().trim();
+        return activities.save(activity);
+    }
+
+    @PatchMapping("/{id}/follow-up")
+    public Enquiry scheduleFollowUp(@PathVariable Long id, @Valid @RequestBody FollowUpRequest input) {
+        if (input.followUpDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Follow-up date is required");
+        }
+        Enquiry enquiry = get(id);
+        enquiry.followUpDate = input.followUpDate();
+        Enquiry saved = repository.save(enquiry);
+        EnquiryActivity activity = new EnquiryActivity();
+        activity.enquiryId = id;
+        activity.message = "Follow-up scheduled for " + input.followUpDate();
+        activities.save(activity);
+        return saved;
     }
 
     @PatchMapping("/{id}/stage")
