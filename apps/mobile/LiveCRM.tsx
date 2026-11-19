@@ -21,7 +21,7 @@ function Choices<T extends string>({ items, value, choose }: { items: readonly T
     <Text style={[styles.chipText, value === item && styles.chipTextOn]}>{item}</Text>
   </Pressable>)}</View>;
 }
-export default function LiveCRM({ user }: { user: CurrentUser }) {
+export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; onStartBooking?: (enquiryId: number) => void }) {
   const [items, setItems] = useState<Enquiry[]>([]);
   const [events, setEvents] = useState<Activity[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -116,6 +116,11 @@ export default function LiveCRM({ user }: { user: CurrentUser }) {
       <Text style={styles.info}>Model: {selected.interestedModel}</Text>
       <Text style={styles.info}>Source: {selected.source}</Text>
       <Text style={styles.info}>Follow-up: {selected.followUpDate || 'Not scheduled'}</Text>
+      {onStartBooking && selected.stage !== 'Booked' && selected.stage !== 'Lost' && (
+        <Pressable style={styles.primary} onPress={() => onStartBooking(selected.id)}>
+          <Text style={styles.primaryText}>Continue to booking →</Text>
+        </Pressable>
+      )}
       <Text style={styles.label}>Pipeline stage</Text>
       <Choices items={stages} value={selected.stage} choose={stage => void execute(() => enquiryApi.stage(selected.id, stage), true)}/>
       <Field label="New activity or call outcome" value={newActivity} onChange={setNewActivity} placeholder="Customer requested another call"/>
