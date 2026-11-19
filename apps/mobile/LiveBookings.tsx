@@ -1,0 +1,202 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { CurrentUser, Enquiry, enquiryApi } from './api/enquiries';
+import { Vehicle, inventoryApi } from './api/inventory';
+import { Booking, BookingEvent, bookingApi } from './api/bookings';
+
+type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
+const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
+const moneylessNote = 'Booking allocation only · Payments, price, invoice and delivery not implemented';
+
+function Input({ label, value, change, hint }: {
+  label: string; value: string; change: (value: string) => void; hint?: string;
+}) {
+  return <View style={s.field}><Text style={s.label}>{label}</Text>
+    <TextInput style={s.input} value={value} onChangeText={change} placeholder={hint}
+      placeholderTextColor="#91A2A9" autoCorrect={false} /></View>;
+}
+function Select({ options, selected, onChange }: {
+  options: { id: string; title: string }[]; selected: string; onChange: (value: string) => void;
+}) {
+  return <View style={s.chips}>{options.map(opt => <Pressable key={opt.id}
+    style={[s.chip, selected === opt.id && s.chipActive]} onPress={() => onChange(opt.id)}>
+    <Text style={[s.chipText, selected === opt.id && s.chipTextActive]}>{opt.title}</Text>
+  </Pressable>)}</View>;
+}
+
+export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props) {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [mode, setMode] = useState<'enquiry' | 'direct'>(enquiryId != null ? 'enquiry' : 'direct');
+  const [selectedEnquiry, setSelectedEnquiry] = useState(enquiryId ? String(enquiryId) : '');
+  const [chassis, setChassis] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [selectedBooking, setSelectedBooking] = useState<number | null>(null);
+  const [events, setEvents] = useState<BookingEvent[]>([]);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const reload = useCallback(async () => {
+    setBusy(true);
+    try {
+      const [sales, crm, stock] = await Promise.all([
+        bookingApi.list(), enquiryApi.list(), inventoryApi.list(),
+      ]);
+      setBookings(sales); setEnquiries(crm); setVehicles(stock); setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load bookings'); }
+    finally { setBusy(false); }
+  }, []);
+
+  useEffect(() => { void reload(); }, [reload, user.username]);
+  useEffect(() => {
+    if (enquiryId != null) {
+      setMode('enquiry'); setSelectedEnquiry(String(enquiryId)); setSelectedBooking(null);
+    }
+  }, [enquiryId]);
+
+  const active = bookings.find(b => b.id === selectedBooking);
+  const enquiry = enquiries.find(e => String(e.id) === selectedEnquiry);
+  const available = useMemo(() => vehicles.filter(v => {
+    if (v.status !== 'AVAILABLE') return false;
+    if (mode === 'enquiry') return enquiry != null && v.branch === enquiry.branch;
+    return user.role === 'ADMIN' || v.branch === user.branch;
+  }), [vehicles, mode, enquiry, user]);
+  const managersOnly = user.role === 'ADMIN' || user.role === 'BRANCH_MANAGER';
+
+  const readEvents = async (id: number) => {
+    try { setEvents(await bookingApi.events(id)); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Unable to read booking history'); }
+  };
+
+  const perform = async (action: () => Promise<Booking>, label: string) => {
+    if (busy) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const changed = await action();
+      const [newBookings, newEnquiries, newVehicles] = await Promise.all([
+        bookingApi.list(), enquiryApi.list(), inventoryApi.list(),
+      ]);
+      setBookings(newBookings); setEnquiries(newEnquiries); setVehicles(newVehicles);
+      setSelectedBooking(changed.id); setEvents(await bookingApi.events(changed.id));
+      setNotice(label); setReason('');
+      setChassis('');
+      onClearEnquiry?.();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Booking action failed'); }
+    finally { setBusy(false); }
+  };
+
+  const create = () => {
+    if (!chassis) { setError('Select an available chassis.'); return; }
+    if (mode === 'enquiry') {
+      if (!enquiry) { setError('Select an existing enquiry.'); return; }
+      void perform(() => bookingApi.create({ enquiryId: enquiry.id, chassis }), 'Booking created from enquiry');
+    } else {
+      if (!customerName.trim() || !/^\d{10}$/.test(customerPhone.trim())) {
+        setError('Enter customer name and a 10-digit phone number.'); return;
+      }
+      void perform(() => bookingApi.create({
+        chassis, customerName: customerName.trim(), customerPhone: customerPhone.trim(),
+      }), 'Direct booking created');
+    }
+  };
+
+  const viewBooking = (id: number) => {
+    setSelectedBooking(id); setEvents([]); setError(''); void readEvents(id);
+  };
+
+  return <View style={s.root}>
+    <View style={s.banner}><Text style={s.bannerText}>DEVELOPMENT SALES · {moneylessNote}. Use synthetic customer details.</Text></View>
+    <Text style={s.heading}>Sales & Bookings</Text>
+    <Text style={s.sub}>{user.displayName} · {user.role} · {user.branch || 'All branches'}</Text>
+    <View style={s.actions}><Pressable onPress={() => void reload()} disabled={busy} style={s.secondary}>
+      <Text style={s.secondaryText}>Refresh</Text></Pressable>
+      {selectedBooking != null && <Pressable onPress={() => { setSelectedBooking(null); setEvents([]); }} style={s.secondary}>
+        <Text style={s.secondaryText}>New booking / list</Text></Pressable>}
+    </View>
+    {busy && <ActivityIndicator color={teal} />}
+    {!!error && <Text style={s.error}>{error}</Text>}
+    {!!notice && <Text style={s.success}>{notice}</Text>}
+    {active ? <View style={s.card}>
+      <Text style={s.title}>Booking #{active.id} · {active.status}</Text>
+      <Text style={s.info}>Customer: {active.customerName} · {active.customerPhone}</Text>
+      <Text style={s.info}>Source: {active.enquiryId == null ? 'Direct booking' : 'Enquiry #' + active.enquiryId}</Text>
+      <Text style={s.info}>Branch: {active.branch} · Salesperson: {active.salesperson}</Text>
+      <Text style={s.info}>Vehicle ID: {active.vehicleId}</Text>
+      {active.status === 'PENDING' && managersOnly && <Pressable style={s.primary}
+        disabled={busy} onPress={() => void perform(() => bookingApi.confirm(active.id), 'Booking confirmed')}>
+        <Text style={s.primaryText}>Confirm booking</Text></Pressable>}
+      {active.status !== 'CANCELLED' && managersOnly && <>
+        <Input label="Cancellation reason *" value={reason} change={setReason}
+          hint="Reason for releasing the vehicle" />
+        <Pressable style={s.secondary} disabled={busy} onPress={() => {
+          if (!reason.trim()) { setError('Cancellation reason is required'); return; }
+          void perform(() => bookingApi.cancel(active.id, reason.trim()), 'Booking cancelled and stock released');
+        }}><Text style={s.secondaryText}>Cancel booking</Text></Pressable>
+      </>}
+      <Text style={s.title}>Booking history</Text>
+      {events.map(e => <Text key={e.id} style={s.info}>
+        • {e.event} · {e.actorUsername}{e.occurredAt ? ' · ' + new Date(e.occurredAt).toLocaleString() : ''}
+      </Text>)}
+    </View> : <>
+      <View style={s.card}>
+        <Text style={s.title}>Create booking</Text>
+        <Select options={[{ id: 'direct', title: 'Direct booking' }, { id: 'enquiry', title: 'From enquiry' }]}
+          selected={mode} onChange={next => { setMode(next as 'direct' | 'enquiry'); setChassis(''); }} />
+        {mode === 'enquiry' ? <>
+          <Text style={s.label}>Select enquiry</Text>
+          <Select options={enquiries.filter(e => e.stage !== 'Booked' && e.stage !== 'Lost')
+            .map(e => ({ id: String(e.id), title: e.customerName + ' · #' + e.id }))}
+            selected={selectedEnquiry} onChange={id => { setSelectedEnquiry(id); setChassis(''); }}/>
+          {enquiry && <Text style={s.info}>Customer: {enquiry.customerName} · {enquiry.phone} · {enquiry.branch}</Text>}
+        </> : <>
+          <Input label="Customer name *" value={customerName} change={setCustomerName} />
+          <Input label="Customer mobile *" value={customerPhone} change={setCustomerPhone} hint="10-digit mobile" />
+        </>}
+        <Text style={s.label}>Select available vehicle</Text>
+        <Select options={available.map(v => ({
+          id: v.chassis, title: v.chassis + ' · ' + v.model + ' · ' + v.branch,
+        }))} selected={chassis} onChange={setChassis} />
+        {!available.length && <Text style={s.sub}>No available vehicles for this booking scope.</Text>}
+        <Pressable disabled={busy || !chassis} style={s.primary} onPress={create}>
+          <Text style={s.primaryText}>Create pending booking</Text>
+        </Pressable>
+      </View>
+      <Text style={s.title}>Existing bookings</Text>
+      {bookings.map(b => <Pressable key={b.id} style={s.card} onPress={() => viewBooking(b.id)}>
+        <Text style={s.title}>#{b.id} · {b.customerName} · {b.status}</Text>
+        <Text style={s.info}>{b.branch} · {b.enquiryId ? 'Enquiry #' + b.enquiryId : 'Direct'}</Text>
+        <Text style={s.link}>View booking →</Text>
+      </Pressable>)}
+      {!bookings.length && <Text style={s.sub}>No bookings found.</Text>}
+    </>}
+  </View>;
+}
+
+const s = StyleSheet.create({
+  root: { paddingBottom: 30 }, heading: { color: ink, fontWeight: '800', fontSize: 23 },
+  sub: { fontSize: 12, color: muted, marginVertical: 8 },
+  banner: { padding: 12, borderRadius: 9, backgroundColor: '#FFF1D8', marginBottom: 14 },
+  bannerText: { fontSize: 11, color: '#805915', fontWeight: '700' },
+  card: { padding: 17, backgroundColor: '#FFF', borderWidth: 1, borderColor: border, borderRadius: 13, marginBottom: 12 },
+  title: { fontSize: 16, color: ink, fontWeight: '800', marginVertical: 11 },
+  label: { fontSize: 12, color: ink, fontWeight: '700', marginTop: 12, marginBottom: 8 },
+  field: { marginBottom: 9 }, input: { borderWidth: 1, borderColor: border, backgroundColor: '#FBFDFD',
+    padding: 12, borderRadius: 9, color: ink, fontSize: 13 },
+  info: { color: muted, fontSize: 12, marginVertical: 5 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 12 },
+  chip: { padding: 9, borderColor: border, borderWidth: 1, borderRadius: 9, backgroundColor: '#FFF' },
+  chipActive: { backgroundColor: teal, borderColor: teal },
+  chipText: { color: ink, fontSize: 11 }, chipTextActive: { color: '#FFF' },
+  actions: { flexDirection: 'row', gap: 9, marginVertical: 10, flexWrap: 'wrap' },
+  primary: { backgroundColor: teal, borderRadius: 9, alignSelf: 'flex-start', padding: 13, marginTop: 12 },
+  primaryText: { fontSize: 12, fontWeight: '800', color: '#FFF' },
+  secondary: { backgroundColor: '#E4F3EE', borderRadius: 9, alignSelf: 'flex-start', padding: 12, marginTop: 8 },
+  secondaryText: { fontSize: 12, fontWeight: '800', color: teal },
+  error: { color: '#B42318', padding: 11, backgroundColor: '#FDE8E8', borderRadius: 9, marginVertical: 9 },
+  success: { color: teal, fontSize: 12, fontWeight: '700', marginVertical: 9 },
+  link: { color: teal, fontSize: 12, fontWeight: '700', marginTop: 8 },
+});
