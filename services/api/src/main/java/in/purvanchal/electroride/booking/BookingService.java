@@ -10,6 +10,7 @@ import in.purvanchal.electroride.inventory.VehicleRepository;
 import in.purvanchal.electroride.security.AppUser;
 import in.purvanchal.electroride.security.EnquiryAccess;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -82,7 +83,12 @@ public class BookingService {
         booking.status = "PENDING";
         booking.priorEnquiryStage = enquiry.stage;
         booking.createdBy = actor.username;
-        Booking saved = bookings.saveAndFlush(booking);
+        Booking saved;
+        try {
+            saved = bookings.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException duplicate) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Enquiry or vehicle already has a live booking");
+        }
         vehicle.status = "RESERVED";
         vehicles.save(vehicle);
         logMovement(vehicle, "RESERVED_FOR_BOOKING", actor.username);
