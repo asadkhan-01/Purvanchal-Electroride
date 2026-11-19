@@ -62,7 +62,7 @@ The current interface supports user creation and listing, not password resets, d
 Example: create a **test salesperson** using the admin account after startup. You can use `curl -u admin` to enter the password interactively; no password is embedded in the shell command or repository:
 
 ```bash
-curl -u admin -H 'Content-Type: application/json' \\
+curl -u admin -H 'Content-Type: application/json' \
   -d '{"username":"aman","password":"REPLACE_WITH_A_DIFFERENT_STRONG_PASSWORD","displayName":"Aman","role":"SALESPERSON","branch":"Varanasi"}' \\
   http://localhost:8080/api/v1/users
 ```
