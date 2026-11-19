@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
@@ -75,6 +76,7 @@ public class EnquiryController {
         return activities.save(activity);
     }
 
+    @Transactional
     @PatchMapping("/{id}/follow-up")
     public Enquiry scheduleFollowUp(@PathVariable Long id, @Valid @RequestBody FollowUpRequest input) {
         if (input.followUpDate() == null) {
@@ -90,6 +92,7 @@ public class EnquiryController {
         return saved;
     }
 
+    @Transactional
     @PatchMapping("/{id}/stage")
     public Enquiry changeStage(@PathVariable Long id, @Valid @RequestBody UpdateStage input) {
         if (!List.of("New", "Contacted", "Interested", "Booked", "Lost").contains(input.stage())) {
@@ -97,6 +100,11 @@ public class EnquiryController {
         }
         Enquiry e = get(id);
         e.stage = input.stage();
-        return repository.save(e);
+        Enquiry saved = repository.save(e);
+        EnquiryActivity event = new EnquiryActivity();
+        event.enquiryId = id;
+        event.message = "Stage changed to " + input.stage();
+        activities.save(event);
+        return saved;
     }
 }
