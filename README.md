@@ -62,6 +62,16 @@ npx expo start --web --host localhost
 
 Open the forwarded **8081** port in Codespaces. The web preview works in demo mode without backend configuration.
 
+### Codespaces phone preview (private forwarding)
+
+To automatically configure the ignored Expo `.env.local` with the current Codespace's private HTTPS API URL (port 8080), run from the repository root:
+
+```bash
+bash scripts/configure-codespaces-preview.sh
+```
+
+The script uses `CODESPACE_NAME`, so it works if the Codespace name differs from previous sessions. It prints the frontend origin and the `APP_CORS_ALLOWED_ORIGIN` startup command for Spring Boot. Restart Spring Boot with that variable and restart Expo on port 8081 to use the new URL. Keep both ports **Private**. Do not commit development credentials. Private Codespaces port authentication can still block cross-origin API calls; if that occurs, use a private same-origin proxy instead of exposing the API publicly.
+
 ### Test logins and role management
 
 When `EXPO_PUBLIC_API_URL` is configured, the app shows a shared sign-in screen for all modules. The backend already supports three roles: `ADMIN` (all branches), `BRANCH_MANAGER` (assigned branch) and `SALESPERSON` (own assigned enquiries and bookings). Log in with the initial development admin account to access the new **Users** tab (web sidebar or mobile bottom navigation), where you can list accounts and create additional test administrators, branch managers or salespeople. Branch is required for non-admin accounts. Then sign out and log in under each role to test the restrictions. Passwords are never embedded in source code; use only synthetic account data. See the backend README for the one-time administrator bootstrap instructions.
