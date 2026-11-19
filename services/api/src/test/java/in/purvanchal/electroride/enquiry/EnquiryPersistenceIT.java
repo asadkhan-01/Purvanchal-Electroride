@@ -60,7 +60,9 @@ class EnquiryPersistenceIT {
         HttpResponse<String> changed = HttpClient.newHttpClient().send(
             HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/enquiries/" + id + "/stage"))
                 .header("Content-Type", "application/json")
-                .method("PATCH", HttpRequest.BodyPublishers.ofString("{\\"stage\\":\\"Interested\\"}"))
+                .method("PATCH", HttpRequest.BodyPublishers.ofString("""
+                    {"stage":"Interested"}
+                    """))
                 .build(), HttpResponse.BodyHandlers.ofString());
         assertThat(changed.statusCode()).isEqualTo(200);
         Enquiry updated = rest.getForObject("/api/v1/enquiries/" + id, Enquiry.class);
