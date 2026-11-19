@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Activity, CurrentUser, Enquiry, NewEnquiry, Stage, enquiryApi, setLoginCredentials, clearLoginCredentials } from './api/enquiries';
+import { Activity, CurrentUser, Enquiry, NewEnquiry, Stage, enquiryApi } from './api/enquiries';
 
 const stages: Stage[] = ['New', 'Contacted', 'Interested', 'Booked', 'Lost'];
 const branches = ['Varanasi', 'Ghazipur', 'Mau'];
@@ -21,10 +21,7 @@ function Choices<T extends string>({ items, value, choose }: { items: readonly T
     <Text style={[styles.chipText, value === item && styles.chipTextOn]}>{item}</Text>
   </Pressable>)}</View>;
 }
-export default function LiveCRM() {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+export default function LiveCRM({ user }: { user: CurrentUser }) {
   const [items, setItems] = useState<Enquiry[]>([]);
   const [events, setEvents] = useState<Activity[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -43,7 +40,7 @@ export default function LiveCRM() {
     finally { setBusy(false); }
   }, []);
 
-  useEffect(() => { if (user) void reload(); }, [user, reload]);
+  useEffect(() => { void reload(); }, [user.username, reload]);
 
   const loadEvents = useCallback(async (id: number) => {
     try { setEvents(await enquiryApi.activities(id)); }
@@ -73,26 +70,6 @@ export default function LiveCRM() {
     } finally { setBusy(false); }
   };
 
-  const login = async () => {
-    setBusy(true); setError('');
-    try {
-      setLoginCredentials(username.trim(), password);
-      const account = await enquiryApi.me();
-      setUser(account);
-      setPassword('');
-      setDraft({ ...empty, branch: account.branch || 'Varanasi',
-        salesperson: account.role === 'SALESPERSON' ? account.displayName : 'Aman' });
-    } catch (e) {
-      clearLoginCredentials();
-      setError(e instanceof Error ? e.message : 'Invalid credentials');
-    } finally { setBusy(false); }
-  };
-
-  const logout = () => {
-    clearLoginCredentials();
-    setUser(null); setItems([]); setEvents([]); setSelectedId(null);
-  };
-
   const create = async () => {
     if (!draft.customerName.trim() || !/^\d{10}$/.test(draft.phone) || !draft.interestedModel.trim()) {
       setError('Enter a name, 10-digit phone number and interested EV model.'); return;
@@ -102,28 +79,13 @@ export default function LiveCRM() {
     }
     let created: Enquiry | null = null;
     const ok = await execute(async () => { created = await enquiryApi.create(draft); });
-    if (ok) { setAdding(false); setDraft(empty); if (created) setSelectedId((created as Enquiry).id); }
+    if (ok) { setAdding(false); setDraft({ ...empty, branch: user.branch || 'Varanasi', salesperson: user.role === 'SALESPERSON' ? user.displayName : 'Aman' }); if (created) setSelectedId((created as Enquiry).id); }
   };
-
-  if (!user) return <View style={styles.root}>
-    <View style={styles.warning}><Text style={styles.warningText}>DEVELOPMENT LOGIN · HTTP Basic over HTTPS only. Do not enter real customer information.</Text></View>
-    <Text style={styles.title}>Sign in to CRM</Text>
-    <Text style={styles.description}>Use the test account provisioned in the Spring Boot API.</Text>
-    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-    <Field label="Username" value={username} onChange={setUsername} />
-    <View style={styles.field}><Text style={styles.label}>Password</Text>
-      <TextInput value={password} onChangeText={setPassword} secureTextEntry
-        autoCapitalize="none" autoCorrect={false} style={styles.input} /></View>
-    <Pressable disabled={busy} style={styles.primary} onPress={() => void login()}>
-      <Text style={styles.primaryText}>{busy ? 'Signing in...' : 'Sign in'}</Text>
-    </Pressable>
-  </View>;
 
   return <View style={styles.root}>
     <View style={styles.warning}><Text style={styles.warningText}>DEVELOPMENT AUTH · Basic authentication and backend-enforced branch visibility. Not production-ready. Synthetic records only.</Text></View>
     <Text style={styles.title}>Enquiry management</Text>
     <Text style={styles.description}>{user.displayName} · {user.role} {user.branch ? '· ' + user.branch : '· All branches'}</Text>
-    <Pressable onPress={logout} style={styles.light}><Text style={styles.lightText}>Sign out</Text></Pressable>
     <Text style={styles.description}>Authenticated Spring Boot API · PostgreSQL persistence</Text>
     {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text>
       <Text style={styles.small}>Check API port visibility, URL, CORS and backend health.</Text></View> : null}
