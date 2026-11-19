@@ -124,7 +124,12 @@ export default function LiveInventory() {
     } else {
       const actionName = type === 'reserve' ? 'Vehicle reserved'
         : type === 'release' ? 'Reservation released' : 'Transfer received';
-      void perform(() => inventoryApi[type](selected.chassis), actionName);
+      const operation = type === 'reserve'
+        ? () => inventoryApi.reserve(selected.chassis)
+        : type === 'release'
+          ? () => inventoryApi.release(selected.chassis)
+          : () => inventoryApi.receive(selected.chassis);
+      void perform(operation, actionName);
     }
   };
 
