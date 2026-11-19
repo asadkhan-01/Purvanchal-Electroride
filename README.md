@@ -64,7 +64,7 @@ Open the forwarded **8081** port in Codespaces. The web preview works in demo mo
 
 ### Optional API-backed CRM and Inventory
 
-The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. Each live screen currently has its own development sign-in prompt, using the shared in-memory HTTP Basic authentication transport; changing modules may require signing in again. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** that prompts for a username and password. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
+The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** with one app-wide sign-in screen for CRM and Inventory. The account's role and branch are obtained once from `/api/v1/auth/me`, retained in React state while the app is running, and passed to both modules. Credentials are held in memory only; sign-out or an HTTP 401 clears them and returns the app to sign-in. A page reload also requires signing in again. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
 
 See **[API setup, endpoint details and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
 
@@ -88,6 +88,8 @@ npm run typecheck
 npm test
 ```
 
+`sharedSession.test.mjs` verifies a single authenticated header is used across CRM and inventory requests, logout clears it, and HTTP 401 resets the session. These are development-only client tests; authorization decisions remain enforced by Spring Boot.
+
 GitHub Actions runs backend tests when backend files change and both TypeScript checks and frontend unit tests when mobile files change. These checks must pass before treating new functionality as verified.
 
 ## Development milestones
@@ -100,7 +102,8 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 6. **Implemented, verification pending — Development security:** database-backed users, admin provisioning, HTTP Basic login, enforced server-side CRM branch/salesperson visibility and automated role tests.
 7. **Backend CI verified — Inventory backend:** persistent chassis and component serials, reservation, branch transfer, receipt, movement history and server-side branch enforcement.
 8. **Implemented, new CI verification pending — Inventory UI integration:** API-connected inventory with role-aware controls and automated frontend rule tests; demo fallback remains.
-9. **Next — Shared authenticated app session and production-hardening roadmap**, followed by sales, finance, accounting, GST and deployment.
+9. **Implemented, CI pending — Shared development login:** a single Expo sign-in, shared role/branch identity, centralized logout and automatic reset on HTTP 401; mobile unit tests cover credential handling.
+10. **Next — Sales and booking foundation:** persistent booking records, inventory allocation and controlled cancellation, followed by finance, accounting, GST and production hardening.
 
 ## Safety and compliance
 
