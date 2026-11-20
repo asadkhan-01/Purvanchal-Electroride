@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Activity, CurrentUser, Enquiry, NewEnquiry, Stage, enquiryApi } from './api/enquiries';
 import { Salesperson, usersApi } from './api/users';
+import { useBranches } from './api/branches';
 
 const stages: Stage[] = ['New', 'Contacted', 'Interested', 'Booked', 'Lost'];
-const branches = ['Varanasi', 'Ghazipur', 'Mau'];
 const sources = ['Walk-in', 'Phone', 'Website', 'Referral'];
-const empty: NewEnquiry = { customerName: '', phone: '', branch: 'Varanasi', salesperson: '',
+const empty: NewEnquiry = { customerName: '', phone: '', branch: '', salesperson: '',
   source: 'Walk-in', interestedModel: '', notes: '', followUpDate: null };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
 function Field({ label, value, onChange, placeholder }: {
@@ -26,11 +26,13 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
   const [events, setEvents] = useState<Activity[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
+  const branches = useBranches();
   const blankDraft = (): NewEnquiry => ({ ...empty,
-    branch: user.branch || 'Varanasi',
+    branch: user.branch || branches[0] || '',
     salesperson: user.role === 'SALESPERSON' ? user.displayName : '',
   });
   const [draft, setDraft] = useState<NewEnquiry>(blankDraft);
+  useEffect(() => { if (!draft.branch && branches.length) setDraft(d => ({ ...d, branch: d.branch || branches[0] })); }, [branches]);
   const [salespeople, setSalespeople] = useState<Salesperson[]>([]);
   const branchSalespeople = salespeople.filter(p => p.branch === draft.branch).map(p => p.displayName);
   const [query, setQuery] = useState('');
@@ -101,12 +103,11 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
   };
 
   return <View style={styles.root}>
-    <View style={styles.warning}><Text style={styles.warningText}>DEVELOPMENT AUTH · Basic authentication and backend-enforced branch visibility. Not production-ready.</Text></View>
     <Text style={styles.title}>Enquiry management</Text>
     <Text style={styles.description}>{user.displayName} · {user.role} {user.branch ? '· ' + user.branch : '· All branches'}</Text>
     <Text style={styles.description}>Authenticated Spring Boot API · PostgreSQL persistence</Text>
     {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text>
-      <Text style={styles.small}>Check API port visibility, URL, CORS and backend health.</Text></View> : null}
+      <Text style={styles.small}>Check your connection and try again.</Text></View> : null}
     <View style={styles.toolbar}><Text style={styles.label}>{items.length} enquiries</Text>
       <Pressable disabled={busy} onPress={() => void reload()} style={styles.light}><Text style={styles.lightText}>Refresh</Text></Pressable>
       <Pressable disabled={busy} onPress={() => { setSelectedId(null); setAdding(true); }} style={styles.primary}><Text style={styles.primaryText}>+ New</Text></Pressable>
@@ -117,7 +118,7 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
       <Field label="Customer name *" value={draft.customerName} onChange={customerName => setDraft({ ...draft, customerName })}/>
       <Field label="Mobile number *" value={draft.phone} onChange={phone => setDraft({ ...draft, phone })}/>
       <Field label="Interested model / variant *" value={draft.interestedModel} onChange={interestedModel => setDraft({ ...draft, interestedModel })}/>
-      <Text style={styles.label}>Branch</Text><Choices items={user.role === 'ADMIN' ? branches : [user.branch || 'Varanasi']} value={draft.branch} choose={branch => setDraft({ ...draft, branch })}/>
+      <Text style={styles.label}>Branch</Text><Choices items={user.role === 'ADMIN' ? branches : [user.branch || '']} value={draft.branch} choose={branch => setDraft({ ...draft, branch })}/>
       <Text style={styles.label}>Salesperson</Text>{user.role === 'SALESPERSON' || branchSalespeople.length
         ? <Choices items={user.role === 'SALESPERSON' ? [user.displayName] : branchSalespeople} value={draft.salesperson} choose={salesperson => setDraft({ ...draft, salesperson })}/>
         : <Text style={styles.description}>No salesperson accounts in {draft.branch} yet.</Text>}

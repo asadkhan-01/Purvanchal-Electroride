@@ -15,7 +15,8 @@ import static org.mockito.Mockito.when;
 class UserControllerSalespeopleTest {
     private final AppUserRepository repo = mock(AppUserRepository.class);
     private final UserController controller =
-        new UserController(repo, mock(PasswordEncoder.class), new EnquiryAccess(repo));
+        new UserController(repo, mock(PasswordEncoder.class), new EnquiryAccess(repo),
+            mock(in.purvanchal.electroride.branch.Branches.class));
 
     private static AppUser user(String username, String name, String role, String branch, boolean enabled) {
         AppUser u = new AppUser();

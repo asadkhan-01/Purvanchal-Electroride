@@ -32,3 +32,13 @@ export function validateInvoice(i: InvoiceDraft): string | null {
   if (subsidy && !money.test(subsidy)) return 'Subsidy must be an amount with at most two decimals.';
   return null;
 }
+
+/** Same rounding as the server: GST per component to paise, total to the nearest rupee, then less subsidy. */
+export function previewTotals(taxable: number, rate: number, interState: boolean, subsidy: number) {
+  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const igst = interState ? r2(taxable * rate / 100) : 0;
+  const cgst = interState ? 0 : r2(taxable * rate / 200);
+  const exact = taxable + 2 * cgst + igst;
+  const rounded = Math.round(exact);
+  return { cgst, sgst: cgst, igst, roundOff: r2(rounded - exact), total: rounded, grandTotal: r2(rounded - subsidy) };
+}

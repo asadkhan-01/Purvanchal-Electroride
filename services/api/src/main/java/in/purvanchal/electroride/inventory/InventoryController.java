@@ -23,9 +23,12 @@ public class InventoryController {
     private final EnquiryAccess users;
     private final InventoryPolicy policy;
     private final BookingRepository bookings;
+    private final in.purvanchal.electroride.branch.Branches branchCheck;
 
     public InventoryController(VehicleRepository vehicles, VehicleMovementRepository movements,
-                               EnquiryAccess users, InventoryPolicy policy, BookingRepository bookings) {
+                               EnquiryAccess users, InventoryPolicy policy, BookingRepository bookings,
+                               in.purvanchal.electroride.branch.Branches branchCheck) {
+        this.branchCheck = branchCheck;
         this.vehicles = vehicles;
         this.movements = movements;
         this.users = users;
@@ -76,6 +79,7 @@ public class InventoryController {
     public Vehicle register(@Valid @RequestBody RegisterVehicle body, Authentication auth) {
         AppUser actor = users.current(auth);
         policy.requireManager(actor, body.branch().trim());
+        branchCheck.requireActive(body.branch());
         Vehicle vehicle = new Vehicle();
         vehicle.chassis = normalize(body.chassis());
         vehicle.model = body.model().trim();
@@ -141,7 +145,7 @@ public class InventoryController {
         policy.requireView(actor, vehicle);
         policy.requireManager(actor, vehicle.branch);
         requireStatus(vehicle, "AVAILABLE");
-        String destination = body.destination().trim();
+        String destination = branchCheck.requireActive(body.destination());
         if (destination.equals(vehicle.branch)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Destination must differ");
         vehicle.status = "IN_TRANSIT";
         vehicle.transferDestination = destination;

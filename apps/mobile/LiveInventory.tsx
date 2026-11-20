@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CurrentUser } from './api/enquiries';
 import { NewVehicle, Vehicle, VehicleMovement, inventoryApi } from './api/inventory';
+import { useBranches } from './api/branches';
 import { allowedAction, canManageBranch, isRegistrationComplete } from './inventoryRules';
 
-const branches = ['Varanasi', 'Ghazipur', 'Mau'];
 const blank: NewVehicle = {
-  chassis: '', model: '', variant: '', colour: '', branch: 'Varanasi',
+  chassis: '', model: '', variant: '', colour: '', branch: '',
   motorSerial: '', batterySerials: [''], chargerSerial: '', controllerSerial: '',
 };
 const ink = '#18343D', teal = '#087D72', muted = '#657A83', border = '#DCE6E9';
@@ -29,7 +29,9 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
   const [movements, setMovements] = useState<VehicleMovement[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<NewVehicle>(() => ({ ...blank, branch: user.branch || 'Varanasi' }));
+  const branches = useBranches();
+  const [draft, setDraft] = useState<NewVehicle>(() => ({ ...blank, branch: user.branch || '' }));
+  useEffect(() => { if (!draft.branch && branches.length) setDraft(d => ({ ...d, branch: d.branch || branches[0] })); }, [branches]);
   const [destination, setDestination] = useState('');
   const [query, setQuery] = useState('');
   const [branchFilter, setBranchFilter] = useState('All');
@@ -85,7 +87,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
     if (!user || !canManageBranch(user, draft.branch)) { setError('Registration requires an authorized manager.'); return; }
     if (!isRegistrationComplete(draft)) { setError('Provide chassis, model, variant, motor, charger and controller serials, and at least one battery serial (no repeats).'); return; }
     const success = await perform(() => inventoryApi.register(draft), 'Vehicle registered in PostgreSQL');
-    if (success) setDraft({ ...blank, branch: user.branch || 'Varanasi' });
+    if (success) setDraft({ ...blank, branch: user.branch || branches[0] || '' });
   };
 
   const action = (type: 'reserve' | 'release' | 'transfer' | 'receive') => {
@@ -111,7 +113,6 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
   };
 
   return <View style={s.root}>
-    <View style={s.banner}><Text style={s.bannerText}>API INVENTORY · Persistent records · Development-only authentication. Use synthetic vehicle data.</Text></View>
     <Text style={s.heading}>Vehicle inventory</Text>
     <Text style={s.sub}>{user.displayName} · {user.role} · {user.branch || 'All branches'}</Text>
     <View style={s.actions}>
@@ -137,7 +138,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
       <Field label="Variant *" value={draft.variant} onChange={variant => setDraft({ ...draft, variant })} />
       <Field label="Colour" value={draft.colour || ''} onChange={colour => setDraft({ ...draft, colour })} />
       <Text style={s.label}>Receiving branch</Text>
-      <Options values={user.role === 'ADMIN' ? branches : [user.branch || 'Varanasi']}
+      <Options values={user.role === 'ADMIN' ? branches : [user.branch || '']}
         value={draft.branch} onSelect={branch => setDraft({ ...draft, branch })} />
       <Field label="Motor serial *" value={draft.motorSerial} onChange={motorSerial => setDraft({ ...draft, motorSerial })} />
       {draft.batterySerials.map((serial, i) => <View key={i}>

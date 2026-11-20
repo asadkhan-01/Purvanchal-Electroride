@@ -50,7 +50,7 @@ export default function App() {
             <Text style={[styles.sideLinkText, section === item && { color: colors.white }]}>{item}</Text>
           </Pressable>)}
           <View style={{ flex: 1 }} />
-          <Text style={styles.sidebarFoot}>Development preview · v0.1</Text>
+          <Text style={styles.sidebarFoot}>v0.1</Text>
         </View>}
         <View style={styles.main}>
           <View style={styles.topbar}>
@@ -63,7 +63,6 @@ export default function App() {
             <View style={styles.avatar}><Text style={styles.avatarText}>{session ? session.displayName.slice(0, 2).toUpperCase() : 'PE'}</Text></View>
           </View>
           <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Test data only. Development sign-in is not production-ready.</Text></View>
             {!apiConfigured ? <View style={styles.placeholder}><Text style={styles.placeholderTitle}>API not configured</Text><Text style={styles.placeholderBody}>Set EXPO_PUBLIC_API_URL in apps/mobile/.env.local (see README) and restart Expo.</Text></View>
             : !session ? <SessionGate user={session} onSignIn={setSession} /> : <>
             {section === 'Overview' && <>
@@ -89,7 +88,7 @@ export default function App() {
             {section === 'Users' && session.role === 'ADMIN' && <AdminUsers />}
             {section === 'Finance' && <LiveFinance user={session} wide={wide} onOpenSales={() => setSection('Sales')} />}
             </>}
-            <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
+            <Text style={styles.footer}>Purvanchal Electroride ERP</Text>
           </ScrollView>
           {!wide && <View style={[styles.bottomNav, { flexWrap: 'wrap' }]}>{visibleSections.map(item => <Pressable key={item} onPress={() => setSection(item)} style={[styles.bottomItem, { minWidth: session?.role === 'ADMIN' ? '16%' : '19%' }]}>
             <Text style={[styles.bottomGlyph, section === item && { color: colors.teal }]}>{item === 'Overview' ? '⌂' : item === 'Enquiries' ? '◎' : item === 'Inventory' ? '▣' : item === 'Sales' ? '↗' : item === 'Users' ? '♙' : '₹'}</Text>
@@ -119,8 +118,6 @@ const styles = StyleSheet.create({
   avatar: { backgroundColor: colors.mint, borderRadius: 22, height: 42, width: 42, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.teal, fontWeight: '800' },
   content: { padding: 20, paddingBottom: 45, maxWidth: 1250, width: '100%', alignSelf: 'center' },
-  demoNotice: { backgroundColor: '#FFF4DC', borderRadius: 8, padding: 11, marginBottom: 17 },
-  demoText: { color: '#805915', fontSize: 11, fontWeight: '700' },
   hero: { backgroundColor: colors.navy, borderRadius: 18, padding: 24, gap: 18, marginBottom: 24 },
   heroEyebrow: { color: '#7CD9C4', fontSize: 10, letterSpacing: 1.7, fontWeight: '800', marginBottom: 12 },
   heroTitle: { color: colors.white, fontSize: 27, fontWeight: '800', lineHeight: 34, maxWidth: 410 },

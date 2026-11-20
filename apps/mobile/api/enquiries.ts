@@ -51,7 +51,7 @@ function encodeAsciiBase64(value: string): string {
 }
 export function setLoginCredentials(username: string, password: string) {
   const pair = username + ':' + password;
-  if (!/^[\x20-\x7E]+$/.test(pair)) throw new Error('Use ASCII characters for development credentials.');
+  if (!/^[\x20-\x7E]+$/.test(pair)) throw new Error('Use English letters, numbers and symbols only.');
   authorization = 'Basic ' + encodeAsciiBase64(pair);
 }
 export function clearLoginCredentials() { authorization = null; }

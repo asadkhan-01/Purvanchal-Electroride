@@ -13,6 +13,7 @@ const page = (title: string, body: string) => `<!doctype html><html><head><meta 
 body{font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#152F38;margin:28px auto;max-width:780px;padding:0 16px}
 .muted{color:#647882}.bar{display:flex;justify-content:space-between;font-weight:700;font-size:12px}
 .tag{background:#152F38;color:#fff;padding:1px 10px;border-radius:5px}
+.dup{text-align:center;font-weight:800;color:#B42318;border:1px dashed #B42318;padding:4px;margin:6px 0}
 .brand{font-size:30px;letter-spacing:1px;text-align:center;margin:6px 0 0;font-weight:900}
 .addr{text-align:center;border-bottom:2px solid #152F38;padding-bottom:8px;margin-bottom:8px}
 .meta{display:flex;justify-content:space-between;margin:6px 0}
@@ -39,8 +40,6 @@ const header = (doc: string, number: string, date: string, branch: string, d?: D
   `${dealerHeader(doc, d?.dealerGstin ?? null, d?.dealerPhone ?? null, d?.dealerAddress ?? null, branch)}
 <div class="meta"><span>No. <b>${esc(number)}</b></span><span>Date: <b>${esc(date)}</b></span></div>`;
 
-const devNote = `<div class="note">Development preview. Have the dealership's accountant review the GST treatment
-before using these documents for real sales.</div>`;
 
 const field = (label: string, value: string) => `<div class="f"><span class="l">${esc(label)}</span><span class="v">${value}</span></div>`;
 const dmy = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
@@ -67,7 +66,8 @@ export function invoiceHtml(inv: Invoice): string {
   const total = inv.taxableValue + inv.cgst + inv.sgst + inv.igst + inv.roundOff;
   const customer = esc(inv.customerName) + (inv.customerRelation ? ` ${esc(inv.customerRelation)} ${esc(inv.customerGuardianName)}` : '');
   return page(inv.invoiceNumber, `${dealerHeader('Tax Invoice', inv.dealerGstin, inv.dealerPhone, inv.dealerAddress, inv.branch)}
-<div class="meta"><span>Invoice No. <b>${esc(inv.invoiceNumber)}</b></span><span>Date: <b>${esc(dmy(inv.invoiceDate))}</b></span></div>
+${inv.source === 'PAPER' ? `<div class="dup">DUPLICATE COPY — recorded from paper invoice${inv.paperBookNumber ? ' Book No. ' + esc(inv.paperBookNumber) + ',' : ''} Invoice No. ${esc(inv.paperInvoiceNumber)}</div>` : ''}
+<div class="meta"><span>Invoice No. <b>${esc(inv.source === 'PAPER' ? (inv.paperBookNumber ? inv.paperBookNumber + '/' : '') + inv.paperInvoiceNumber : inv.invoiceNumber)}</b></span><span>Date: <b>${esc(dmy(inv.invoiceDate))}</b></span></div>
 ${field('Customer Name', customer)}${field('Mobile No.', esc(inv.customerPhone))}
 ${field('Address', esc(inv.customerAddress))}
 ${inv.customerGstin ? field('Customer GSTIN', esc(inv.customerGstin)) : ''}
@@ -88,8 +88,7 @@ ${inv.roundOff ? `<tr><td colspan="3" class="n">Round off</td><td class="n">${in
 ${inv.subsidy ? `<tr><td colspan="3" class="n">Less incentive / subsidy</td><td class="n">− ${inr(inv.subsidy)}</td></tr>` : ''}
 <tr class="grand"><td colspan="3" class="n">GRAND TOTAL</td><td class="n">${inr(inv.grandTotal)}</td></tr></table></div>
 ${field('Rupees in Words', '<b>' + esc(rupeesInWords(inv.grandTotal)) + '</b>')}
-<div class="sign"><span>Customer's Signature</span><span>For- <b>Purvanchal Electroride</b><br><small>Issued by ${esc(inv.issuedBy)}</small></span></div>
-${devNote}`);
+<div class="sign"><span>Customer's Signature</span><span>For- <b>Purvanchal Electroride</b><br><small>Issued by ${esc(inv.issuedBy)}</small></span></div>`);
 }
 
 export function receiptHtml(r: Receipt, customerName: string, dealer?: DealerInfo | null): string {
@@ -98,7 +97,7 @@ export function receiptHtml(r: Receipt, customerName: string, dealer?: DealerInf
 (${esc(rupeesInWords(r.amount))}) by <b>${esc(modeTitle(r.mode))}</b>${r.reference ? ', reference ' + esc(r.reference) : ''}
 ${r.financeCompany ? ', disbursed by ' + esc(r.financeCompany) : ''}, against booking #${esc(r.bookingId)}.</p>
 ${r.status === 'VOIDED' ? `<p style="color:#B42318"><b>VOID</b> · ${esc(r.voidReason)}</p>` : ''}
-${r.notes ? `<p class="muted">Note: ${esc(r.notes)}</p>` : ''}<p class="muted">Recorded by ${esc(r.recordedBy)}</p>${devNote}`);
+${r.notes ? `<p class="muted">Note: ${esc(r.notes)}</p>` : ''}<p class="muted">Recorded by ${esc(r.recordedBy)}</p>`);
 }
 
 /** Opens a printable document in a new tab (web). Returns false where printing isn't available. */

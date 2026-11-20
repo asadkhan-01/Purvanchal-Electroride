@@ -33,7 +33,7 @@ export default function SessionGate({ user, onSignIn }: Props) {
   if (user) return null;
   return <View style={styles.card}>
     <Text style={styles.title}>Sign in to Purvanchal Electroride</Text>
-    <Text style={styles.subtitle}>One development session for Enquiries, Inventory, Sales and Users. Use test credentials only.</Text>
+    <Text style={styles.subtitle}>Sign in with your username and password.</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
     <Text style={styles.label}>Username</Text>
     <TextInput style={styles.input} value={username} onChangeText={setUsername}
@@ -46,7 +46,6 @@ export default function SessionGate({ user, onSignIn }: Props) {
       style={styles.button}>
       {busy ? <ActivityIndicator color="#FFFFFF"/> : <Text style={styles.buttonText}>Sign in</Text>}
     </Pressable>
-    <Text style={styles.note}>HTTP Basic credentials remain in memory and are cleared on sign-out or app reload. This is not production authentication.</Text>
   </View>;
 }
 

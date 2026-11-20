@@ -51,7 +51,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
 
   const open = booking.status === 'PENDING' || booking.status === 'CONFIRMED';
   const balance = account.balance ?? 0;
-  const canPay = open && account.quotationApproved && balance > 0;
+  const canPay = (open || (booking.status === 'DELIVERED' && !!account.invoice)) && account.quotationApproved && balance > 0;
   const recordPayment = () => {
     const problem = validatePayment(pay, balance);
     if (problem) { setError(problem); return; }

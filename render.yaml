@@ -22,8 +22,8 @@ services:
         value: admin
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
-      # Printed on invoices and receipts. Optional per-branch overrides:
-      # DEALER_ADDRESS_GHAZIPUR, DEALER_ADDRESS_VARANASI, DEALER_PHONE_<BRANCH>.
+      # Optional overrides. Defaults: GSTIN and mobile in application.yml (same for every branch),
+      # branch address from the branches table (per-branch override: DEALER_ADDRESS_<BRANCH>).
       - key: DEALER_GSTIN
         sync: false
       - key: DEALER_PHONE

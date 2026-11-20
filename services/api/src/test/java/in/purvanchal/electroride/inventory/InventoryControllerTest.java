@@ -24,6 +24,13 @@ class InventoryControllerTest {
     @MockitoBean VehicleRepository vehicles;
     @MockitoBean VehicleMovementRepository movements;
     @MockitoBean EnquiryAccess access;
+    @MockitoBean in.purvanchal.electroride.branch.Branches branches;
+
+    @org.junit.jupiter.api.BeforeEach
+    void knownBranches() {
+        org.mockito.Mockito.when(branches.requireActive(org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(call -> ((String) call.getArgument(0)).trim());
+    }
     @MockitoBean InventoryPolicy policy;
     @MockitoBean BookingRepository bookings;
 
