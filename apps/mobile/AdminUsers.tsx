@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { usersApi, UserView, NewUser } from './api/users';
 import { userRoles, validateNewUser } from './userRules';
 import { useBranches } from './api/branches';
+import PasswordInput from './PasswordInput';
 
 const teal = '#087D72', ink = '#18343D', border = '#DCE6E9';
 const empty: NewUser = {
@@ -14,8 +15,8 @@ function Field({ label, value, onChange, secure = false }: {
   label: string; value: string; onChange: (value: string) => void; secure?: boolean;
 }) {
   return <View style={styles.field}><Text style={styles.label}>{label}</Text>
-    <TextInput style={styles.input} value={value} onChangeText={onChange}
-      autoCapitalize="none" autoCorrect={false} secureTextEntry={secure}/></View>;
+    {secure ? <PasswordInput value={value} onChangeText={onChange} />
+      : <TextInput style={styles.input} value={value} onChangeText={onChange} autoCapitalize="none" autoCorrect={false} />}</View>;
 }
 
 export default function AdminUsers() {
