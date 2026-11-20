@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CurrentUser, enquiryApi, clearLoginCredentials, setLoginCredentials } from './api/enquiries';
+import PasswordInput from './PasswordInput';
 
 type Props = {
   user: CurrentUser | null;
@@ -39,8 +40,7 @@ export default function SessionGate({ user, onSignIn }: Props) {
     <TextInput style={styles.input} value={username} onChangeText={setUsername}
       autoCapitalize="none" autoCorrect={false} editable={!busy} />
     <Text style={styles.label}>Password</Text>
-    <TextInput style={styles.input} value={password} onChangeText={setPassword}
-      secureTextEntry autoCapitalize="none" autoCorrect={false} editable={!busy}
+    <PasswordInput value={password} onChangeText={setPassword} editable={!busy}
       onSubmitEditing={() => void signIn()} />
     <Pressable onPress={() => void signIn()} disabled={busy || !username.trim() || !password}
       style={styles.button}>
