@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CurrentUser } from './api/enquiries';
 import { FinanceSummary, billingApi, inr, modeTitle } from './api/billing';
+import { toDmy } from './dates';
+import SalesReport from './SalesReport';
 
 const ink = '#152F38', teal = '#087D72', muted = '#647882', line = '#E3EAED', red = '#B42318';
 
@@ -14,6 +16,16 @@ const monthName = (ym: string) => new Date(ym + '-01T00:00:00Z').toLocaleDateStr
 
 /** Collections, invoicing and dues for the bookings the signed-in user can see. */
 export default function LiveFinance({ user, wide, onOpenSales }: { user: CurrentUser; wide: boolean; onOpenSales: () => void }) {
+  const canReport = user.role === 'ADMIN' || user.role === 'BRANCH_MANAGER';
+  const [view, setView] = useState<'summary' | 'report'>('summary');
+  const tabs = canReport && <View style={s.tabs}>{(['summary', 'report'] as const).map(v =>
+    <Pressable key={v} onPress={() => setView(v)} style={[s.tab, view === v && s.tabOn]}>
+      <Text style={[s.tabText, view === v && s.tabTextOn]}>{v === 'summary' ? 'Summary' : 'Sales report'}</Text></Pressable>)}</View>;
+  if (canReport && view === 'report') return <View>{tabs}<SalesReport user={user} wide={wide} /></View>;
+  return <FinanceSummaryView user={user} wide={wide} onOpenSales={onOpenSales} tabs={tabs} />;
+}
+
+function FinanceSummaryView({ user, wide, onOpenSales, tabs }: { user: CurrentUser; wide: boolean; onOpenSales: () => void; tabs: React.ReactNode }) {
   const [month, setMonth] = useState<string | null>(null);
   const [data, setData] = useState<FinanceSummary | null>(null);
   const [error, setError] = useState('');
@@ -35,6 +47,7 @@ export default function LiveFinance({ user, wide, onOpenSales }: { user: Current
   const modes = Object.entries(data.collectedByMode);
 
   return <View>
+    {tabs}
     <Text style={s.scope}>{user.displayName} · {user.role.replace('_', ' ')} · {user.branch ?? 'All branches'}</Text>
     <View style={s.monthRow}>
       <Pressable onPress={() => setMonth(shift(data.month, -1))} style={s.monthBtn}><Text style={s.link}>‹ Prev</Text></Pressable>
@@ -66,7 +79,7 @@ export default function LiveFinance({ user, wide, onOpenSales }: { user: Current
       : data.recentReceipts.map(r => <View key={r.id} style={[s.row, r.status === 'VOIDED' && { opacity: 0.55 }]}>
         <View style={{ flex: 1 }}>
           <Text style={s.rowText}>{r.customerName}{r.status === 'VOIDED' ? ' · VOIDED' : ''}</Text>
-          <Text style={s.muted}>{r.receiptNumber} · {r.receivedOn} · {modeTitle(r.mode)}{r.reference ? ' · ' + r.reference : ''}</Text>
+          <Text style={s.muted}>{r.receiptNumber} · {toDmy(r.receivedOn)} · {modeTitle(r.mode)}{r.reference ? ' · ' + r.reference : ''}</Text>
         </View>
         <Text style={s.rowValue}>{inr(r.amount)}</Text>
       </View>)}
@@ -74,6 +87,11 @@ export default function LiveFinance({ user, wide, onOpenSales }: { user: Current
 }
 
 const s = StyleSheet.create({
+  tabs: { flexDirection: 'row', backgroundColor: '#E8EFF1', borderRadius: 11, padding: 4, marginBottom: 14, alignSelf: 'flex-start' },
+  tab: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 8 },
+  tabOn: { backgroundColor: '#FFF' },
+  tabText: { color: muted, fontWeight: '700', fontSize: 13 },
+  tabTextOn: { color: ink },
   banner: { padding: 11, borderRadius: 9, backgroundColor: '#FFF1D8', marginBottom: 12 },
   bannerText: { fontSize: 11, color: '#805915', fontWeight: '700' },
   scope: { color: muted, fontSize: 12, marginBottom: 8 },

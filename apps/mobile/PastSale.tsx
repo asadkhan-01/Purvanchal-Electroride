@@ -6,11 +6,11 @@ import { PaymentMode, idTypes, inr, paymentModes, relations } from './api/billin
 import { Salesperson, usersApi } from './api/users';
 import { PastPayment, pastSaleApi, previewTotals } from './api/pastSales';
 import { useBranches } from './api/branches';
+import { parseDmy, todayIso } from './dates';
 
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9', red = '#B42318';
 const money = /^(0|[1-9]\d{0,11})(\.\d{1,2})?$/;
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
-const todayIso = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
 
 function Input({ label, value, change, hint, half }: { label: string; value: string; change: (v: string) => void; hint?: string; half?: boolean }) {
   return <View style={[s.field, half && s.half]}><Text style={s.label}>{label}</Text>
@@ -58,21 +58,22 @@ export default function PastSale({ user, stock, onDone, onCancel }: {
   const paid = pays.reduce((sum, p) => sum + (money.test(p.amount.trim()) ? Number(p.amount) : 0), 0);
 
   const submit = async () => {
-    const usedPays = pays.filter(p => p.amount.trim());
+    const usedPays = pays.filter(p => p.amount.trim()).map(p => ({ ...p, receivedOn: parseDmy(p.receivedOn) ?? '' }));
+    const invoiceIso = parseDmy(paper.invoiceDate) ?? '', deliveredIso = parseDmy(paper.deliveredOn) ?? '';
     const problem =
       !c.name.trim() ? 'Customer name is required.' : !/^\d{10}$/.test(c.phone.trim()) ? 'Enter a 10-digit mobile number.'
       : !c.address.trim() ? 'Customer address is required.' : c.relation && !c.guardian.trim() ? "Enter the father's / guardian's name."
       : c.aadhaar.trim() && !/^\d{4}$/.test(c.aadhaar.trim()) ? 'Aadhaar: enter only the last 4 digits.'
       : c.idType && !c.idNumber.trim() ? 'Enter the ID number.'
       : !paper.number.trim() ? 'Paper invoice number is required.'
-      : !isoDate.test(paper.invoiceDate.trim()) ? 'Invoice date must be YYYY-MM-DD.' : !isoDate.test(paper.deliveredOn.trim()) ? 'Delivery date must be YYYY-MM-DD.'
-      : paper.deliveredOn < paper.invoiceDate ? 'Delivery date cannot be before the invoice date.'
-      : paper.invoiceDate > todayIso() || paper.deliveredOn > todayIso() ? 'Dates cannot be in the future.'
+      : !invoiceIso ? 'Invoice date must be a real date as DD/MM/YYYY.' : !deliveredIso ? 'Delivery date must be a real date as DD/MM/YYYY.'
+      : deliveredIso < invoiceIso ? 'Delivery date cannot be before the invoice date.'
+      : invoiceIso > todayIso() || deliveredIso > todayIso() ? 'Dates cannot be in the future.'
       : !chassis.trim() ? 'Choose or enter the chassis / frame number.'
       : !fromStock && (!v.model.trim() || !v.variant.trim() || !v.motor.trim() || !v.charger.trim() || !v.controller.trim() || !v.batteries.some(b => b.trim()))
         ? 'Enter model, variant, motor, battery, charger and controller numbers.'
       : !preview ? 'Enter valid amounts (vehicle price before GST is required).'
-      : usedPays.some(p => !money.test(p.amount.trim()) || !isoDate.test(p.receivedOn.trim()) || p.receivedOn > todayIso()) ? 'Each payment needs an amount and a date (YYYY-MM-DD), not in the future.'
+      : usedPays.some(p => !money.test(p.amount.trim()) || !isoDate.test(p.receivedOn.trim()) || p.receivedOn > todayIso()) ? 'Each payment needs an amount and a date (DD/MM/YYYY), not in the future.'
       : usedPays.some(p => p.mode !== 'CASH' && !p.reference.trim()) ? 'Non-cash payments need a reference (UTR, cheque or loan no.).'
       : usedPays.some(p => p.mode === 'FINANCE' && !p.financeCompany.trim()) ? 'Finance payments need the finance company.'
       : paid > (preview?.grandTotal ?? 0) + 1e-9 ? 'Payments are more than the invoice total.' : null;
@@ -91,7 +92,7 @@ export default function PastSale({ user, stock, onDone, onCancel }: {
         newVehicle: fromStock ? undefined : { model: v.model.trim(), variant: v.variant.trim(), colour: v.colour.trim() || undefined,
           motorSerial: v.motor.trim(), batterySerials: v.batteries.map(b => b.trim()).filter(Boolean), chargerSerial: v.charger.trim(), controllerSerial: v.controller.trim() },
         paperBookNumber: paper.book.trim() || undefined, paperInvoiceNumber: paper.number.trim(),
-        invoiceDate: paper.invoiceDate.trim(), deliveredOn: paper.deliveredOn.trim(),
+        invoiceDate: invoiceIso, deliveredOn: deliveredIso,
         vehiclePrice: amt.price.trim(), discount: amt.discount.trim() || '0', accessories: amt.accessories.trim() || '0', otherCharges: amt.other.trim() || '0',
         payments,
       });
@@ -113,8 +114,8 @@ export default function PastSale({ user, stock, onDone, onCancel }: {
     <View style={s.row}>
       <Input half label="Book no." value={paper.book} change={book => setPaper({ ...paper, book })} hint="e.g. 16" />
       <Input half label="Invoice no. *" value={paper.number} change={number => setPaper({ ...paper, number })} />
-      <Input half label="Invoice date * (YYYY-MM-DD)" value={paper.invoiceDate} change={invoiceDate => setPaper({ ...paper, invoiceDate })} />
-      <Input half label="Delivered on * (YYYY-MM-DD)" value={paper.deliveredOn} change={deliveredOn => setPaper({ ...paper, deliveredOn })} hint="Same day if unsure" />
+      <Input half label="Invoice date * (DD/MM/YYYY)" value={paper.invoiceDate} change={invoiceDate => setPaper({ ...paper, invoiceDate })} />
+      <Input half label="Delivered on * (DD/MM/YYYY)" value={paper.deliveredOn} change={deliveredOn => setPaper({ ...paper, deliveredOn })} hint="Same day if unsure" />
     </View>
     <Text style={s.label}>Salesperson</Text>
     <Chips items={spOptions} value={salesperson} choose={setSalesperson} />
@@ -180,7 +181,7 @@ export default function PastSale({ user, stock, onDone, onCancel }: {
     {pays.map((p, i) => <View key={i} style={s.pay}>
       <View style={s.row}>
         <Input half label={`Amount ${i + 1}`} value={p.amount} change={amount => setPay(i, { amount })} />
-        <Input half label="Date (YYYY-MM-DD)" value={p.receivedOn} change={receivedOn => setPay(i, { receivedOn })} />
+        <Input half label="Date (DD/MM/YYYY)" value={p.receivedOn} change={receivedOn => setPay(i, { receivedOn })} />
       </View>
       <Chips items={paymentModes} value={p.mode} choose={mode => setPay(i, { mode: mode as PaymentMode })} />
       {p.mode !== 'CASH' && <Input label={p.mode === 'FINANCE' ? 'Loan / disbursement no.' : 'Reference (UTR / cheque no.)'} value={p.reference} change={reference => setPay(i, { reference })} />}

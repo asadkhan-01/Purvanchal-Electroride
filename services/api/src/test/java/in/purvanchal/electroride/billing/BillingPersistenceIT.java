@@ -346,5 +346,38 @@ class BillingPersistenceIT {
             "role", "SALESPERSON", "branch", "Mau")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void salesReportFiltersByDateModelAndBranchScope() {
+        java.time.LocalDate today = BillingService.today(), old = today.minusDays(200);
+        String chassis = "RPT-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String paperNo = "R" + (1000 + new java.util.Random().nextInt(8000));
+        Map<String, Object> body = pastSale("Varanasi", chassis, paperNo, old, old,
+            java.util.List.of(Map.of("amount", "20000", "mode", "UPI", "reference", "UTR-R1", "receivedOn", old.toString())), true);
+        assertThat(post("bill-manager", "/api/v1/past-sales", body).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        String range = "/api/v1/reports/sales?from=" + old + "&to=" + old;
+        assertThat(get("bill-sales", range).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        Map report = get("bill-manager", range).getBody();
+        java.util.List<Map> rows = (java.util.List<Map>) report.get("rows");
+        Map row = rows.stream().filter(r -> chassis.equals(r.get("chassis"))).findFirst().orElseThrow();
+        assertThat(row.get("invoiceNumber")).isEqualTo("16/" + paperNo);
+        assertThat(row.get("model")).isEqualTo("ZL-PRO");
+        assertThat(row.get("salesperson")).isEqualTo("Asha");
+        assertThat(row.get("received").toString()).isEqualTo("20000.0");
+        assertThat(row.get("balance").toString()).isEqualTo("30000.0");
+        assertThat(row.get("paymentModes")).isEqualTo("UPI");
+        assertThat(((Map) report.get("totals")).get("count")).isEqualTo(rows.size());
+
+        assertThat(((java.util.List) get("bill-manager", range + "&model=zl-pro").getBody().get("rows"))).isNotEmpty();
+        assertThat(((java.util.List) get("bill-manager", range + "&model=City%20Glide").getBody().get("rows"))).isEmpty();
+        assertThat(((java.util.List) get("bill-manager", "/api/v1/reports/sales?from=" + old.minusDays(1) + "&to=" + old.minusDays(1))
+            .getBody().get("rows"))).isEmpty();
+        assertThat(((java.util.List) get("bill-other", range).getBody().get("rows"))).as("Ghazipur manager sees no Varanasi sales").isEmpty();
+        assertThat(get("bill-other", range + "&branch=Varanasi").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(((java.util.List) get("bill-admin", range + "&branch=Varanasi").getBody().get("rows"))).isNotEmpty();
+        assertThat(get("bill-admin", "/api/v1/reports/sales?from=" + today + "&to=" + old).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     private HttpHeaders auth(String who) { HttpHeaders h = new HttpHeaders(); h.setBasicAuth(who, PW); return h; }
 }

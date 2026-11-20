@@ -14,7 +14,7 @@ export function validatePayment(p: PaymentDraft, balance: number): string | null
   if (Number(amount) > balance + 1e-9) return 'Amount is more than the balance due.';
   if (p.mode !== 'CASH' && !p.reference.trim()) return 'Enter the payment reference (UTR, cheque or loan number).';
   if (p.mode === 'FINANCE' && !p.financeCompany.trim()) return 'Enter the finance company.';
-  if (p.receivedOn.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(p.receivedOn.trim())) return 'Received date must be YYYY-MM-DD.';
+  if (p.receivedOn.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(p.receivedOn.trim())) return 'Received date must be a real date as DD/MM/YYYY.';
   return null;
 }
 
@@ -41,4 +41,13 @@ export function previewTotals(taxable: number, rate: number, interState: boolean
   const exact = taxable + 2 * cgst + igst;
   const rounded = Math.round(exact);
   return { cgst, sgst: cgst, igst, roundOff: r2(rounded - exact), total: rounded, grandTotal: r2(rounded - subsidy) };
+}
+
+/** CSV for Excel: quoted fields, CRLF lines, UTF-8 BOM so ₹ and Hindi text open correctly. */
+export function toCsv(header: string[], rows: (string | number | null | undefined)[][]): string {
+  const cell = (v: string | number | null | undefined) => {
+    const s = v == null ? '' : String(v);
+    return /[",\r\n]/.test(s) || /^[=+\-@]/.test(s) ? '"' + (/^[=+\-@]/.test(s) ? "'" : '') + s.replace(/"/g, '""') + '"' : s;
+  };
+  return '﻿' + [header, ...rows].map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }

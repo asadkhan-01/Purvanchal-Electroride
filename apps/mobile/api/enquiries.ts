@@ -63,28 +63,51 @@ export const apiUrl = rawApiUrl.replace(/\/$/, '');
 export const apiConfigured = apiUrl.startsWith('https://') || apiUrl.startsWith('http://localhost:')
   || rawApiUrl === '/' || /^\/[A-Za-z0-9_-]+$/.test(apiUrl);
 
+/** API failure with a message that can be shown to users as-is. */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) { super(message); this.status = status; this.name = 'ApiError'; }
+}
+
+/** Turns an HTTP status and the server's problem detail into a plain sentence for users. */
+export function friendlyError(status: number, detail: string | undefined): string {
+  const d = (detail ?? '').trim();
+  if (status === 401) return 'Incorrect username or password.';
+  if (status >= 500) return 'Something went wrong on the server. Please try again in a moment.';
+  if (status === 403) return d && d !== 'Forbidden' ? d + '.' : "You don't have permission to do this.";
+  if (status === 404) return d && d !== 'Not Found' ? d + '.' : 'Not found.';
+  if (status === 400 && (!d || d === 'Bad Request' || d.startsWith('Invalid request content') || d.startsWith('Failed to read request')))
+    return 'Please check the details you entered.';
+  return d ? (/[.!?]$/.test(d) ? d : d + '.') : 'The request could not be completed.';
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!apiConfigured) throw new Error('API URL not configured');
-  const response = await fetch(apiUrl + path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(authorization ? { Authorization: authorization } : {}),
-      ...(init?.headers || {}),
-    },
-  });
+  if (!apiConfigured) throw new Error('The app is not connected to the server.');
+  let response: Response;
+  try {
+    response = await fetch(apiUrl + path, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(init?.headers || {}),
+      },
+    });
+  } catch {
+    throw new ApiError(0, 'Cannot reach the server. Check your internet connection and try again.');
+  }
   if (response.status === 401) {
     clearLoginCredentials();
     onUnauthorized?.();
   }
   if (!response.ok) {
-    const error = await response.text().catch(() => '');
-    let message = error.slice(0, 160);
+    const body = await response.text().catch(() => '');
+    let detail: string | undefined;
     try {
-      const parsed = JSON.parse(error) as { detail?: string; title?: string };
-      message = parsed.detail || parsed.title || message;
+      const parsed = JSON.parse(body) as { detail?: string; title?: string };
+      detail = parsed.detail || parsed.title;
     } catch { /* not JSON */ }
-    throw new Error('API ' + response.status + ': ' + (message || response.statusText));
+    throw new ApiError(response.status, friendlyError(response.status, detail));
   }
   return await response.json() as T;
 }

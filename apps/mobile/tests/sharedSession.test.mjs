@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:8080';
-const { setLoginCredentials, clearLoginCredentials, enquiryApi, request } =
+const { setLoginCredentials, clearLoginCredentials, enquiryApi, request, friendlyError } =
   await import('../api/enquiries.ts');
 
 test('one in-memory login authorizes requests across API modules', async () => {
@@ -61,7 +61,7 @@ test('401 clears credentials and notifies the app session gate', async () => {
   };
   try {
     setLoginCredentials('admin', 'test-password-123');
-    await assert.rejects(request('/api/v1/inventory'), /API 401/);
+    await assert.rejects(request('/api/v1/inventory'), { status: 401 });
     assert.ok(auth?.startsWith('Basic '));
     assert.equal(expired, 1);
     globalThis.fetch = async (_url, options) => {
@@ -75,4 +75,24 @@ test('401 clears credentials and notifies the app session gate', async () => {
     setUnauthorizedHandler(null);
     globalThis.fetch = original;
   }
+});
+
+test('a wrong password shows a clear message instead of a bare status code', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 401, text: async () => '' });
+  try {
+    setLoginCredentials('mgr.test', 'wrong-password-1');
+    await assert.rejects(enquiryApi.me(), { message: 'Incorrect username or password.', status: 401 });
+  } finally { clearLoginCredentials(); globalThis.fetch = original; }
+});
+
+test('server reasons and network failures read as plain sentences', async () => {
+  assert.equal(friendlyError(409, 'Amount exceeds balance due of Rs 500'), 'Amount exceeds balance due of Rs 500.');
+  assert.equal(friendlyError(400, 'Invalid request content.'), 'Please check the details you entered.');
+  assert.equal(friendlyError(500, 'boom'), 'Something went wrong on the server. Please try again in a moment.');
+  assert.equal(friendlyError(403, 'Forbidden'), "You don't have permission to do this.");
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+  try { await assert.rejects(request('/api/v1/inventory'), /Cannot reach the server/); }
+  finally { globalThis.fetch = original; }
 });
