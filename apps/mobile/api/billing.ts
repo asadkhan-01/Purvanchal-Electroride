@@ -24,6 +24,7 @@ export type Invoice = {
   vehiclePrice: number; discount: number; accessories: number; otherCharges: number; taxableValue: number;
   gstRate: number; taxType: 'CGST_SGST' | 'IGST'; cgst: number; sgst: number; igst: number;
   roundOff: number; grandTotal: number; issuedBy: string;
+  source: 'APP' | 'PAPER'; paperBookNumber: string | null; paperInvoiceNumber: string | null;
 };
 export type Account = {
   bookingId: number; bookingStatus: string; quotationApproved: boolean; estimated: boolean;

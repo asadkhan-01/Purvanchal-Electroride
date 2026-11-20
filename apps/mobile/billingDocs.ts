@@ -13,6 +13,7 @@ const page = (title: string, body: string) => `<!doctype html><html><head><meta 
 body{font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#152F38;margin:28px auto;max-width:780px;padding:0 16px}
 .muted{color:#647882}.bar{display:flex;justify-content:space-between;font-weight:700;font-size:12px}
 .tag{background:#152F38;color:#fff;padding:1px 10px;border-radius:5px}
+.dup{text-align:center;font-weight:800;color:#B42318;border:1px dashed #B42318;padding:4px;margin:6px 0}
 .brand{font-size:30px;letter-spacing:1px;text-align:center;margin:6px 0 0;font-weight:900}
 .addr{text-align:center;border-bottom:2px solid #152F38;padding-bottom:8px;margin-bottom:8px}
 .meta{display:flex;justify-content:space-between;margin:6px 0}
@@ -67,7 +68,8 @@ export function invoiceHtml(inv: Invoice): string {
   const total = inv.taxableValue + inv.cgst + inv.sgst + inv.igst + inv.roundOff;
   const customer = esc(inv.customerName) + (inv.customerRelation ? ` ${esc(inv.customerRelation)} ${esc(inv.customerGuardianName)}` : '');
   return page(inv.invoiceNumber, `${dealerHeader('Tax Invoice', inv.dealerGstin, inv.dealerPhone, inv.dealerAddress, inv.branch)}
-<div class="meta"><span>Invoice No. <b>${esc(inv.invoiceNumber)}</b></span><span>Date: <b>${esc(dmy(inv.invoiceDate))}</b></span></div>
+${inv.source === 'PAPER' ? `<div class="dup">DUPLICATE COPY — recorded from paper invoice${inv.paperBookNumber ? ' Book No. ' + esc(inv.paperBookNumber) + ',' : ''} Invoice No. ${esc(inv.paperInvoiceNumber)}</div>` : ''}
+<div class="meta"><span>Invoice No. <b>${esc(inv.source === 'PAPER' ? (inv.paperBookNumber ? inv.paperBookNumber + '/' : '') + inv.paperInvoiceNumber : inv.invoiceNumber)}</b></span><span>Date: <b>${esc(dmy(inv.invoiceDate))}</b></span></div>
 ${field('Customer Name', customer)}${field('Mobile No.', esc(inv.customerPhone))}
 ${field('Address', esc(inv.customerAddress))}
 ${inv.customerGstin ? field('Customer GSTIN', esc(inv.customerGstin)) : ''}

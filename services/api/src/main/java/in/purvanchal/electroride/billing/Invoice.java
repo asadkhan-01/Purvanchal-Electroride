@@ -50,5 +50,9 @@ public class Invoice {
     @Column(nullable = false, updatable = false) public BigDecimal subsidy;
     @Column(name = "grand_total", nullable = false, updatable = false) public BigDecimal grandTotal;
     @Column(name = "issued_by", nullable = false, updatable = false) public String issuedBy;
+    /** APP = issued in this system; PAPER = recorded later from the paper invoice book. */
+    @Column(nullable = false, updatable = false) public String source = "APP";
+    @Column(name = "paper_book_number", updatable = false) public String paperBookNumber;
+    @Column(name = "paper_invoice_number", updatable = false) public String paperInvoiceNumber;
     @Column(name = "created_at", insertable = false, updatable = false) public OffsetDateTime createdAt;
 }

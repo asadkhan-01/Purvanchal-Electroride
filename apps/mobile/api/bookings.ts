@@ -16,6 +16,7 @@ export type Booking = {
   cancellationReason: string | null;
   deliveredBy?: string | null;
   deliveredAt?: string | null;
+  recordedFromPaper?: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 };

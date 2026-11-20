@@ -22,6 +22,7 @@ public class Booking {
     @Column(name = "cancellation_reason") public String cancellationReason;
     @Column(name = "delivered_by") public String deliveredBy;
     @Column(name = "delivered_at") public OffsetDateTime deliveredAt;
+    @Column(name = "recorded_from_paper", nullable = false) public boolean recordedFromPaper;
     @Column(name = "created_at", insertable = false, updatable = false) public OffsetDateTime createdAt;
     @Column(name = "updated_at", nullable = false) public OffsetDateTime updatedAt;
 

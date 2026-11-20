@@ -95,8 +95,9 @@ public class BillingService {
     @Transactional
     public PaymentReceipt recordPayment(Long bookingId, PaymentRequest req, AppUser actor) {
         Booking booking = lockVisible(bookingId, actor);
-        if (!List.of("PENDING", "CONFIRMED").contains(booking.status))
-            throw conflict("Payments can only be recorded on pending or confirmed bookings");
+        boolean deliveredWithDues = "DELIVERED".equals(booking.status) && invoices.existsByBookingId(booking.id);
+        if (!List.of("PENDING", "CONFIRMED").contains(booking.status) && !deliveredWithDues)
+            throw conflict("Payments can only be recorded on pending or confirmed bookings, or delivered ones with dues");
         // Validate the request itself (400) before business rules (409).
         BigDecimal amount = BillingMath.amount(req.amount());
         String mode = req.mode() == null ? "" : req.mode().trim().toUpperCase(Locale.ROOT);
@@ -174,6 +175,18 @@ public class BillingService {
         BookingQuotation quote = quotations.findByBookingId(bookingId)
             .filter(q -> "APPROVED".equals(q.status))
             .orElseThrow(() -> conflict("An approved quotation is required to invoice"));
+        Vehicle vehicle = vehicles.findById(booking.vehicleId).orElseThrow(() -> conflict("Vehicle not found"));
+        LocalDate date = today();
+        Invoice inv = buildInvoice(booking, vehicle, quote, req, date, () -> numbers.next("INV", booking.branch, date),
+            accountOf(booking).received(), false, actor);
+        Invoice saved = invoices.save(inv);
+        log(booking.id, "INVOICED", actor, saved.invoiceNumber + " · Rs " + saved.grandTotal.toPlainString());
+        return saved;
+    }
+
+    /** Validates customer/KYC/tax inputs and builds (does not save) the invoice. Shared by app and paper invoices. */
+    Invoice buildInvoice(Booking booking, Vehicle vehicle, BookingQuotation quote, InvoiceRequest req, LocalDate date,
+                         java.util.function.Supplier<String> number, BigDecimal received, boolean paper, AppUser actor) {
         String address = blankToNull(req.customerAddress());
         if (address == null || address.length() > 300) throw bad("Customer address is required (max 300 characters)");
         String gstin = blankToNull(req.customerGstin());
@@ -200,20 +213,17 @@ public class BillingService {
         BigDecimal subsidy = req.subsidy() == null || req.subsidy().signum() == 0
             ? BigDecimal.ZERO.setScale(2) : BillingMath.amount(req.subsidy());
 
-        Vehicle vehicle = vehicles.findById(booking.vehicleId).orElseThrow(() -> conflict("Vehicle not found"));
         BigDecimal rate = BillingMath.rate(req.gstRate());
         BillingMath.Tax tax = BillingMath.tax(quote.subtotalExcludingTax, rate, req.interState());
         BigDecimal grandTotal = tax.grandTotal().subtract(subsidy);
         if (grandTotal.signum() <= 0) throw bad("Subsidy must be less than the invoice total");
-        BigDecimal received = accountOf(booking).received();
         if (received.compareTo(grandTotal) > 0)
-            throw conflict("Receipts exceed the invoice total; void the excess receipt first");
+            throw conflict(paper ? "Payments exceed the invoice total" : "Receipts exceed the invoice total; void the excess receipt first");
 
-        LocalDate date = today();
         Invoice inv = new Invoice();
         inv.bookingId = booking.id;
         inv.branch = booking.branch;
-        inv.invoiceNumber = numbers.next("INV", booking.branch, date);
+        inv.invoiceNumber = number.get();
         inv.invoiceDate = date;
         inv.customerName = booking.customerName;
         inv.customerPhone = booking.customerPhone;
@@ -251,9 +261,7 @@ public class BillingService {
         inv.subsidy = subsidy;
         inv.grandTotal = grandTotal;
         inv.issuedBy = actor.username;
-        Invoice saved = invoices.save(inv);
-        log(booking.id, "INVOICED", actor, saved.invoiceNumber + " · Rs " + saved.grandTotal.toPlainString());
-        return saved;
+        return inv;
     }
 
     @Transactional
@@ -287,14 +295,14 @@ public class BillingService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
     }
 
-    private void log(Long bookingId, String event, AppUser actor, String details) {
+    void log(Long bookingId, String event, AppUser actor, String details) {
         BookingEvent e = new BookingEvent();
         e.bookingId = bookingId; e.event = event; e.actorUsername = actor.username;
         e.details = details != null && details.length() > 500 ? details.substring(0, 500) : details;
         events.save(e);
     }
 
-    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
+    static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
     private static ResponseStatusException conflict(String m) { return new ResponseStatusException(HttpStatus.CONFLICT, m); }
     private static ResponseStatusException bad(String m) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, m); }
 }

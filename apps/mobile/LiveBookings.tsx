@@ -6,6 +6,7 @@ import { Booking, BookingEvent, bookingApi } from './api/bookings';
 import { bookingPayload } from './bookingRules';
 import { BookingQuotation, quotationApi } from './api/quotations';
 import BookingBilling from './BookingBilling';
+import PastSale from './PastSale';
 
 type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
@@ -41,6 +42,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   const [reason, setReason] = useState('');
   const [quotation, setQuotation] = useState<BookingQuotation | null>(null);
   const [inclusive, setInclusive] = useState('');
+  const [recordingPast, setRecordingPast] = useState(false);
   const [quoteFields, setQuoteFields] = useState({
     vehiclePrice: '', discount: '0', accessories: '0', otherCharges: '0',
   });
@@ -168,8 +170,10 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
     {busy && <ActivityIndicator color={teal} />}
     {!!error && <Text style={s.error}>{error}</Text>}
     {!!notice && <Text style={s.success}>{notice}</Text>}
-    {active ? <View style={s.card}>
-      <Text style={s.title}>Booking #{active.id} · {active.status}</Text>
+    {recordingPast ? <PastSale user={user} stock={vehicles} onCancel={() => setRecordingPast(false)}
+      onDone={(id, message) => { setRecordingPast(false); void reload().then(() => { viewBooking(id); setNotice(message); }); }} />
+    : active ? <View style={s.card}>
+      <Text style={s.title}>Booking #{active.id} · {active.status}{active.recordedFromPaper ? ' · PAPER INVOICE' : ''}</Text>
       <Text style={s.info}>Customer: {active.customerName} · {active.customerPhone}</Text>
       <Text style={s.info}>Source: {active.enquiryId == null ? 'Direct booking' : 'Enquiry #' + active.enquiryId}</Text>
       <Text style={s.info}>Branch: {active.branch} · Salesperson: {active.salesperson}</Text>
@@ -248,9 +252,11 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
           <Text style={s.primaryText}>Create pending booking</Text>
         </Pressable>
       </View>
+      {managersOnly && <Pressable style={s.secondary} onPress={() => { setSelectedBooking(null); setRecordingPast(true); }}>
+        <Text style={s.secondaryText}>+ Record past sale (paper invoice)</Text></Pressable>}
       <Text style={s.title}>Existing bookings</Text>
       {bookings.map(b => <Pressable key={b.id} style={s.card} onPress={() => viewBooking(b.id)}>
-        <Text style={s.title}>#{b.id} · {b.customerName} · {b.status}</Text>
+        <Text style={s.title}>#{b.id} · {b.customerName} · {b.status}{b.recordedFromPaper ? ' · paper' : ''}</Text>
         <Text style={s.info}>{b.branch} · {b.salesperson} · {b.enquiryId ? 'Enquiry #' + b.enquiryId : 'Direct'}</Text>
         <Text style={s.link}>View booking →</Text>
       </Pressable>)}

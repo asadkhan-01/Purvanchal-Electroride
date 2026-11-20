@@ -242,4 +242,77 @@ class BillingPersistenceIT {
         assertThat(body.get("chargerSerial").toString()).startsWith("C");
         assertThat(get("bill-sales", b + "/account").getBody().get("payable").toString()).isEqualTo("94750.0");
     }
+
+    private Map<String, Object> pastSale(String branch, String chassis, String paperNo, java.time.LocalDate invoiceDate,
+                                         java.time.LocalDate deliveredOn, java.util.List<Map<String, Object>> payments, boolean newVehicle) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("branch", branch); body.put("salesperson", "Asha");
+        body.put("customerName", "Past Customer"); body.put("customerPhone", "9000000601");
+        body.put("customer", Map.of("customerAddress", "Test Village, Varanasi", "customerRelation", "S/o",
+            "customerGuardianName", "Past Father", "aadhaarLast4", "6001", "financier", "Test Finance Ltd"));
+        body.put("chassis", chassis);
+        if (newVehicle) body.put("newVehicle", Map.of("model", "ZL-PRO", "variant", "Standard", "colour", "Red",
+            "motorSerial", "PM-" + chassis, "batterySerials", java.util.List.of("PB1-" + chassis, "PB2-" + chassis),
+            "chargerSerial", "PC-" + chassis, "controllerSerial", "PK-" + chassis));
+        body.put("paperBookNumber", "16"); body.put("paperInvoiceNumber", paperNo);
+        body.put("invoiceDate", invoiceDate.toString()); body.put("deliveredOn", deliveredOn.toString());
+        body.put("vehiclePrice", "47619.05"); body.put("discount", "0"); body.put("accessories", "0"); body.put("otherCharges", "0");
+        body.put("payments", payments);
+        return body;
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void managerRecordsBackdatedPaperSale() {
+        java.time.LocalDate today = BillingService.today();
+        java.time.LocalDate inv = today.minusDays(40), delivered = today.minusDays(38);
+        String chassis = "PAST-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        String paperNo = String.valueOf(100 + new java.util.Random().nextInt(800));
+        java.util.List<Map<String, Object>> pays = java.util.List.of(
+            Map.of("amount", "10000", "mode", "UPI", "reference", "UTR-P1", "receivedOn", today.minusDays(45).toString()),
+            Map.of("amount", "35000", "mode", "FINANCE", "reference", "LN-P1", "financeCompany", "Test Finance Ltd",
+                "receivedOn", today.minusDays(36).toString()));
+        Map<String, Object> body = pastSale("Varanasi", chassis, paperNo, inv, delivered, pays, true);
+
+        assertThat(post("bill-sales", "/api/v1/past-sales", body).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(post("bill-other", "/api/v1/past-sales", body).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        Map future = new java.util.HashMap<>(body); future.put("invoiceDate", today.plusDays(1).toString());
+        assertThat(post("bill-manager", "/api/v1/past-sales", future).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Map early = new java.util.HashMap<>(body); early.put("deliveredOn", inv.minusDays(1).toString());
+        assertThat(post("bill-manager", "/api/v1/past-sales", early).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<Map> res = post("bill-manager", "/api/v1/past-sales", body);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Map invoice = (Map) res.getBody().get("invoice");
+        assertThat(invoice.get("source")).isEqualTo("PAPER");
+        assertThat(invoice.get("invoiceNumber")).isEqualTo("PAPER/VAR/16/" + paperNo);
+        assertThat(invoice.get("invoiceDate")).isEqualTo(inv.toString());
+        assertThat(invoice.get("grandTotal").toString()).isEqualTo("50000.0");
+        assertThat(invoice.get("batterySerials").toString()).isEqualTo("PB1-" + chassis + ", PB2-" + chassis);
+        Map booking = (Map) res.getBody().get("booking");
+        assertThat(booking.get("status")).isEqualTo("DELIVERED");
+        assertThat(booking.get("recordedFromPaper")).isEqualTo(true);
+        long id = ((Number) booking.get("id")).longValue();
+        assertThat(vehicles.findByChassis(chassis).orElseThrow().status).isEqualTo("SOLD");
+
+        assertThat(post("bill-manager", "/api/v1/past-sales", pastSale("Varanasi", chassis + "X", paperNo, inv, delivered, java.util.List.of(), true))
+            .getStatusCode()).as("same paper number twice").isEqualTo(HttpStatus.CONFLICT);
+
+        // Rs 5,000 still due: the salesperson collects it now on the delivered sale.
+        Map acc = get("bill-sales", "/api/v1/bookings/" + id + "/account").getBody();
+        assertThat(acc.get("balance").toString()).isEqualTo("5000.0");
+        assertThat(post("bill-sales", "/api/v1/bookings/" + id + "/payments", pay("5000", "CASH", null)).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(post("bill-sales", "/api/v1/bookings/" + id + "/payments", pay("1", "CASH", null)).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        // Revenue lands in the month of the paper invoice; payments in their own months.
+        String month = java.time.YearMonth.from(inv).toString();
+        Map summary = get("bill-manager", "/api/v1/finance/summary?month=" + month).getBody();
+        assertThat(new java.math.BigDecimal(summary.get("invoicedThisMonth").toString())).isGreaterThanOrEqualTo(new java.math.BigDecimal("50000"));
+
+        // Existing stock path: an available vehicle in the branch is sold directly; a reserved one is refused.
+        long reservedBooking = quotedBooking();
+        String reservedChassis = vehicles.findById(((Number) get("bill-sales", "/api/v1/bookings/" + reservedBooking).getBody().get("vehicleId")).longValue()).orElseThrow().chassis;
+        assertThat(post("bill-manager", "/api/v1/past-sales", pastSale("Varanasi", reservedChassis, paperNo + "9", inv, delivered, java.util.List.of(), false))
+            .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
 }
