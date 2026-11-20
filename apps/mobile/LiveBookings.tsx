@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { CurrentUser, Enquiry, enquiryApi } from './api/enquiries';
+import { ApiError, CurrentUser, Enquiry, enquiryApi } from './api/enquiries';
 import { Vehicle, inventoryApi } from './api/inventory';
 import { Booking, BookingEvent, bookingApi } from './api/bookings';
 import { bookingPayload } from './bookingRules';
 import { BookingQuotation, quotationApi } from './api/quotations';
 import BookingBilling from './BookingBilling';
 import PastSale from './PastSale';
+import { toDmyTime } from './dates';
 
 type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
@@ -79,7 +80,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   const readQuotation = async (id: number) => {
     try { setQuotation(await quotationApi.get(id)); }
     catch (e) {
-      if (e instanceof Error && e.message.startsWith('API 404:')) setQuotation(null);
+      if (e instanceof ApiError && e.status === 404) setQuotation(null);
       else setError(e instanceof Error ? e.message : 'Unable to load quotation');
     }
   };
@@ -224,7 +225,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
       </>}
       <Text style={s.title}>Booking history</Text>
       {events.map(e => <Text key={e.id} style={s.info}>
-        • {e.event} · {e.actorUsername}{e.occurredAt ? ' · ' + new Date(e.occurredAt).toLocaleString() : ''}
+        • {e.event} · {e.actorUsername}{e.occurredAt ? ' · ' + toDmyTime(e.occurredAt) : ''}
       </Text>)}
     </View> : <>
       <View style={s.card}>

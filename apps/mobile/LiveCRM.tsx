@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { Activity, CurrentUser, Enquiry, NewEnquiry, Stage, enquiryApi } from './api/enquiries';
 import { Salesperson, usersApi } from './api/users';
 import { useBranches } from './api/branches';
+import { parseDmy, toDmy, toDmyTime } from './dates';
 
 const stages: Stage[] = ['New', 'Contacted', 'Interested', 'Booked', 'Lost'];
 const sources = ['Walk-in', 'Phone', 'Website', 'Referral'];
@@ -94,11 +95,12 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
     if (!draft.salesperson) {
       setError('Choose a salesperson. Create a salesperson account for this branch in Users first.'); return;
     }
-    if (draft.followUpDate && !/^\d{4}-\d{2}-\d{2}$/.test(draft.followUpDate)) {
-      setError('Follow-up date must use YYYY-MM-DD.'); return;
+    const followUpIso = draft.followUpDate ? parseDmy(draft.followUpDate) : null;
+    if (draft.followUpDate && !followUpIso) {
+      setError('Follow-up date must be a real date as DD/MM/YYYY.'); return;
     }
     let created: Enquiry | null = null;
-    const ok = await execute(async () => { created = await enquiryApi.create(draft); });
+    const ok = await execute(async () => { created = await enquiryApi.create({ ...draft, followUpDate: followUpIso }); });
     if (ok) { setAdding(false); setDraft(blankDraft()); if (created) setSelectedId((created as Enquiry).id); }
   };
 
@@ -123,7 +125,7 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
         ? <Choices items={user.role === 'SALESPERSON' ? [user.displayName] : branchSalespeople} value={draft.salesperson} choose={salesperson => setDraft({ ...draft, salesperson })}/>
         : <Text style={styles.description}>No salesperson accounts in {draft.branch} yet.</Text>}
       <Text style={styles.label}>Source</Text><Choices items={sources} value={draft.source} choose={source => setDraft({ ...draft, source })}/>
-      <Field label="Follow-up date (YYYY-MM-DD)" value={draft.followUpDate || ''} onChange={followUpDate => setDraft({ ...draft, followUpDate: followUpDate || null })}/>
+      <Field label="Follow-up date (DD/MM/YYYY)" value={draft.followUpDate || ''} onChange={followUpDate => setDraft({ ...draft, followUpDate: followUpDate || null })}/>
       <Field label="Notes" value={draft.notes || ''} onChange={notes => setDraft({ ...draft, notes })}/>
       <View style={styles.actions}><Pressable disabled={busy} onPress={() => void create()} style={styles.primary}><Text style={styles.primaryText}>Save enquiry</Text></Pressable>
         <Pressable onPress={() => setAdding(false)} style={styles.light}><Text style={styles.lightText}>Cancel</Text></Pressable></View>
@@ -133,7 +135,7 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
       <Text style={styles.description}>{selected.phone} · {selected.branch} · {selected.salesperson}</Text>
       <Text style={styles.info}>Model: {selected.interestedModel}</Text>
       <Text style={styles.info}>Source: {selected.source}</Text>
-      <Text style={styles.info}>Follow-up: {selected.followUpDate || 'Not scheduled'}</Text>
+      <Text style={styles.info}>Follow-up: {toDmy(selected.followUpDate) || 'Not scheduled'}</Text>
       {onStartBooking && selected.stage !== 'Booked' && selected.stage !== 'Lost' && (
         <Pressable style={styles.primary} onPress={() => onStartBooking(selected.id)}>
           <Text style={styles.primaryText}>Continue to booking →</Text>
@@ -146,13 +148,14 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
         if (!newActivity.trim()) { setError('Enter an activity note'); return; }
         void (async () => { if (await execute(() => enquiryApi.addActivity(selected.id, newActivity.trim()), true)) setNewActivity(''); })();
       }} style={styles.primary}><Text style={styles.primaryText}>Add activity</Text></Pressable>
-      <Field label="Schedule follow-up (YYYY-MM-DD)" value={newFollowUp} onChange={setNewFollowUp}/>
+      <Field label="Schedule follow-up (DD/MM/YYYY)" value={newFollowUp} onChange={setNewFollowUp}/>
       <Pressable disabled={busy} onPress={() => {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(newFollowUp)) { setError('Use YYYY-MM-DD for follow-up'); return; }
-        void (async () => { if (await execute(() => enquiryApi.followUp(selected.id, newFollowUp), true)) setNewFollowUp(''); })();
+        const iso = parseDmy(newFollowUp);
+        if (!iso) { setError('Enter the follow-up date as DD/MM/YYYY'); return; }
+        void (async () => { if (await execute(() => enquiryApi.followUp(selected.id, iso), true)) setNewFollowUp(''); })();
       }} style={styles.light}><Text style={styles.lightText}>Save follow-up</Text></Pressable>
       <Text style={[styles.cardTitle, { marginTop: 23 }]}>Activity history</Text>
-      {events.map(e => <Text key={e.id} style={styles.history}>• {e.message}{e.createdAt ? ' · ' + new Date(e.createdAt).toLocaleString() : ''}</Text>)}
+      {events.map(e => <Text key={e.id} style={styles.history}>• {e.message}{e.createdAt ? ' · ' + toDmyTime(e.createdAt) : ''}</Text>)}
       {!events.length && <Text style={styles.small}>No activity history yet</Text>}
     </View> : <>
       <Field label="Search" value={query} onChange={setQuery} placeholder="Customer, phone, branch, model"/>
@@ -160,7 +163,7 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
         <View style={styles.listTop}><Text style={styles.name}>{e.customerName}</Text><Text style={styles.stage}>{e.stage}</Text></View>
         <Text style={styles.small}>{e.phone} · {e.branch} · {e.salesperson}</Text>
         <Text style={styles.small}>{e.interestedModel}</Text>
-        <Text style={styles.link}>Follow-up: {e.followUpDate || 'Not scheduled'} →</Text>
+        <Text style={styles.link}>Follow-up: {toDmy(e.followUpDate) || 'Not scheduled'} →</Text>
       </Pressable>)}
       {!visible.length && !busy && <Text style={styles.small}>No enquiries found. Create a test enquiry to get started.</Text>}
     </>}

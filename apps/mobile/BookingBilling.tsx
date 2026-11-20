@@ -5,9 +5,9 @@ import type { Booking } from './api/bookings';
 import { Account, PaymentMode, billingApi, idTitle, idTypes, inr, modeTitle, paymentModes, relations } from './api/billing';
 import { invoiceHtml, printDocument, receiptHtml } from './billingDocs';
 import { validatePayment, validateInvoice } from './billingRules';
+import { parseDmy, toDmy, toDmyTime, todayDmy } from './dates';
 
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9', red = '#B42318';
-const todayIso = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10); // India date
 
 function Input({ label, value, change, hint }: { label: string; value: string; change: (v: string) => void; hint?: string }) {
   return <View style={s.field}><Text style={s.label}>{label}</Text>
@@ -27,7 +27,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
   const [account, setAccount] = useState<Account | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [pay, setPay] = useState({ amount: '', mode: 'UPI' as PaymentMode, reference: '', financeCompany: '', receivedOn: todayIso(), notes: '' });
+  const [pay, setPay] = useState({ amount: '', mode: 'UPI' as PaymentMode, reference: '', financeCompany: '', receivedOn: todayDmy(), notes: '' });
   const [inv, setInv] = useState({ customerAddress: '', customerGstin: '', gstRate: '5', interState: false,
     customerRelation: '', customerGuardianName: '', idType: '', idNumber: '', aadhaarLast4: '', financier: '', subsidy: '' });
   const [voiding, setVoiding] = useState<number | null>(null);
@@ -53,12 +53,13 @@ export default function BookingBilling({ user, booking, onChanged }: {
   const balance = account.balance ?? 0;
   const canPay = (open || (booking.status === 'DELIVERED' && !!account.invoice)) && account.quotationApproved && balance > 0;
   const recordPayment = () => {
-    const problem = validatePayment(pay, balance);
+    const receivedIso = pay.receivedOn.trim() ? (parseDmy(pay.receivedOn) ?? 'invalid') : '';
+    const problem = validatePayment({ ...pay, receivedOn: receivedIso }, balance);
     if (problem) { setError(problem); return; }
     void run(() => billingApi.pay(booking.id, {
       amount: pay.amount.trim(), mode: pay.mode, reference: pay.mode === 'CASH' ? undefined : pay.reference.trim(),
       financeCompany: pay.mode === 'FINANCE' ? pay.financeCompany.trim() : undefined,
-      receivedOn: pay.receivedOn.trim() || undefined, notes: pay.notes.trim() || undefined,
+      receivedOn: receivedIso || undefined, notes: pay.notes.trim() || undefined,
     }).then(r => { setPay(p => ({ ...p, amount: '', reference: '', notes: '' })); return r; }), 'Payment recorded');
   };
   const issueInvoice = () => {
@@ -96,7 +97,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
         value={pay.reference} change={reference => setPay({ ...pay, reference })} />}
       {pay.mode === 'FINANCE' && <Input label="Finance company *" value={pay.financeCompany} change={financeCompany => setPay({ ...pay, financeCompany })} />}
       {pay.mode === 'CASH' && <Text style={s.info}>Total cash on one booking must stay below ₹2,00,000 (Income Tax Act s.269ST).</Text>}
-      <Input label="Received on (YYYY-MM-DD)" value={pay.receivedOn} change={receivedOn => setPay({ ...pay, receivedOn })} />
+      <Input label="Received on (DD/MM/YYYY)" value={pay.receivedOn} change={receivedOn => setPay({ ...pay, receivedOn })} />
       <Input label="Notes" value={pay.notes} change={notes => setPay({ ...pay, notes })} hint="e.g. booking advance" />
       <Pressable disabled={busy} style={s.primary} onPress={recordPayment}><Text style={s.primaryText}>Record payment</Text></Pressable>
     </View>}
@@ -106,7 +107,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
     {account.receipts.map(r => <View key={r.id} style={[s.row, r.status === 'VOIDED' && { opacity: 0.6 }]}>
       <View style={{ flex: 1 }}>
         <Text style={s.rowTitle}>{inr(r.amount)} · {modeTitle(r.mode)}{r.status === 'VOIDED' ? ' · VOIDED' : ''}</Text>
-        <Text style={s.info}>{r.receiptNumber} · {r.receivedOn}{r.reference ? ' · ' + r.reference : ''}{r.financeCompany ? ' · ' + r.financeCompany : ''}</Text>
+        <Text style={s.info}>{r.receiptNumber} · {toDmy(r.receivedOn)}{r.reference ? ' · ' + r.reference : ''}{r.financeCompany ? ' · ' + r.financeCompany : ''}</Text>
         {r.status === 'VOIDED' && <Text style={s.info}>Void: {r.voidReason} ({r.voidedBy})</Text>}
         {voiding === r.id && <>
           <Input label="Void reason *" value={voidReason} change={setVoidReason} hint="e.g. refunded, entered twice" />
@@ -127,7 +128,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
 
     <Text style={s.sub}>Tax invoice</Text>
     {account.invoice ? <View style={s.box}>
-      <Text style={s.rowTitle}>{account.invoice.invoiceNumber} · {account.invoice.invoiceDate}</Text>
+      <Text style={s.rowTitle}>{account.invoice.invoiceNumber} · {toDmy(account.invoice.invoiceDate)}</Text>
       <Text style={s.info}>Taxable value {inr(account.invoice.taxableValue)} · GST {account.invoice.gstRate}% {account.invoice.taxType === 'IGST'
         ? 'IGST ' + inr(account.invoice.igst) : 'CGST ' + inr(account.invoice.cgst) + ' + SGST ' + inr(account.invoice.sgst)}</Text>
       <Text style={s.info}>Round off {inr(account.invoice.roundOff)} · Total {inr(account.invoice.grandTotal)}</Text>
@@ -163,7 +164,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
     </View> : <Text style={s.info}>{booking.status === 'PENDING' ? 'A manager issues the invoice after confirming the booking.'
       : booking.status === 'CANCELLED' ? 'Cancelled booking.' : 'The branch manager issues the invoice.'}</Text>}
 
-    {booking.status === 'DELIVERED' ? <Text style={s.success}>Delivered{booking.deliveredBy ? ' by ' + booking.deliveredBy : ''}{booking.deliveredAt ? ' · ' + new Date(booking.deliveredAt).toLocaleString() : ''}</Text>
+    {booking.status === 'DELIVERED' ? <Text style={s.success}>Delivered{booking.deliveredBy ? ' by ' + booking.deliveredBy : ''}{booking.deliveredAt ? ' · ' + toDmyTime(booking.deliveredAt) : ''}</Text>
       : booking.status === 'CONFIRMED' && manager && <>
         {account.invoice && balance === 0
           ? <Pressable disabled={busy} style={s.primary} onPress={() => void run(() => billingApi.deliver(booking.id), 'Vehicle delivered')}><Text style={s.primaryText}>Mark delivered</Text></Pressable>
