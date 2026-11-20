@@ -50,6 +50,24 @@ public class UserController {
         return users.findAll().stream().map(UserView::from).toList();
     }
 
+    /** Name and branch only, for assigning enquiries: admins see all, managers their branch, salespeople themselves. */
+    public record SalespersonView(String displayName, String branch) {}
+
+    @GetMapping("/salespeople")
+    public List<SalespersonView> salespeople(Authentication authentication) {
+        AppUser me = access.current(authentication);
+        return users.findAll().stream()
+            .filter(u -> u.enabled && "SALESPERSON".equals(u.role))
+            .filter(u -> switch (me.role) {
+                case "ADMIN" -> true;
+                case "BRANCH_MANAGER" -> me.branch != null && me.branch.equals(u.branch);
+                default -> u.username.equals(me.username);
+            })
+            .map(u -> new SalespersonView(u.displayName, u.branch))
+            .sorted(java.util.Comparator.comparing(SalespersonView::branch).thenComparing(SalespersonView::displayName))
+            .toList();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserView create(@Valid @RequestBody CreateUser input, Authentication authentication) {

@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Activity, CurrentUser, Enquiry, NewEnquiry, Stage, enquiryApi } from './api/enquiries';
+import { Salesperson, usersApi } from './api/users';
 
 const stages: Stage[] = ['New', 'Contacted', 'Interested', 'Booked', 'Lost'];
 const branches = ['Varanasi', 'Ghazipur', 'Mau'];
-const salespeople = ['Aman', 'Sana', 'Neha'];
 const sources = ['Walk-in', 'Phone', 'Website', 'Referral'];
-const empty: NewEnquiry = { customerName: '', phone: '', branch: 'Varanasi', salesperson: 'Aman',
+const empty: NewEnquiry = { customerName: '', phone: '', branch: 'Varanasi', salesperson: '',
   source: 'Walk-in', interestedModel: '', notes: '', followUpDate: null };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
 function Field({ label, value, onChange, placeholder }: {
@@ -26,10 +26,13 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
   const [events, setEvents] = useState<Activity[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<NewEnquiry>(() => ({ ...empty,
+  const blankDraft = (): NewEnquiry => ({ ...empty,
     branch: user.branch || 'Varanasi',
-    salesperson: user.role === 'SALESPERSON' ? user.displayName : 'Aman',
-  }));
+    salesperson: user.role === 'SALESPERSON' ? user.displayName : '',
+  });
+  const [draft, setDraft] = useState<NewEnquiry>(blankDraft);
+  const [salespeople, setSalespeople] = useState<Salesperson[]>([]);
+  const branchSalespeople = salespeople.filter(p => p.branch === draft.branch).map(p => p.displayName);
   const [query, setQuery] = useState('');
   const [newActivity, setNewActivity] = useState('');
   const [newFollowUp, setNewFollowUp] = useState('');
@@ -44,6 +47,15 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
   }, []);
 
   useEffect(() => { void reload(); }, [user.username, reload]);
+  useEffect(() => {
+    if (user.role === 'SALESPERSON') return;
+    usersApi.salespeople().then(setSalespeople).catch(() => setSalespeople([]));
+  }, [user.username, user.role]);
+  // Keep the chosen salesperson valid for the chosen branch.
+  useEffect(() => {
+    if (user.role === 'SALESPERSON' || branchSalespeople.includes(draft.salesperson)) return;
+    setDraft(d => ({ ...d, salesperson: branchSalespeople[0] ?? '' }));
+  }, [draft.branch, salespeople]);
 
   const loadEvents = useCallback(async (id: number) => {
     try { setEvents(await enquiryApi.activities(id)); }
@@ -77,16 +89,19 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
     if (!draft.customerName.trim() || !/^\d{10}$/.test(draft.phone) || !draft.interestedModel.trim()) {
       setError('Enter a name, 10-digit phone number and interested EV model.'); return;
     }
+    if (!draft.salesperson) {
+      setError('Choose a salesperson. Create a salesperson account for this branch in Users first.'); return;
+    }
     if (draft.followUpDate && !/^\d{4}-\d{2}-\d{2}$/.test(draft.followUpDate)) {
       setError('Follow-up date must use YYYY-MM-DD.'); return;
     }
     let created: Enquiry | null = null;
     const ok = await execute(async () => { created = await enquiryApi.create(draft); });
-    if (ok) { setAdding(false); setDraft({ ...empty, branch: user.branch || 'Varanasi', salesperson: user.role === 'SALESPERSON' ? user.displayName : 'Aman' }); if (created) setSelectedId((created as Enquiry).id); }
+    if (ok) { setAdding(false); setDraft(blankDraft()); if (created) setSelectedId((created as Enquiry).id); }
   };
 
   return <View style={styles.root}>
-    <View style={styles.warning}><Text style={styles.warningText}>DEVELOPMENT AUTH · Basic authentication and backend-enforced branch visibility. Not production-ready. Synthetic records only.</Text></View>
+    <View style={styles.warning}><Text style={styles.warningText}>DEVELOPMENT AUTH · Basic authentication and backend-enforced branch visibility. Not production-ready.</Text></View>
     <Text style={styles.title}>Enquiry management</Text>
     <Text style={styles.description}>{user.displayName} · {user.role} {user.branch ? '· ' + user.branch : '· All branches'}</Text>
     <Text style={styles.description}>Authenticated Spring Boot API · PostgreSQL persistence</Text>
@@ -103,7 +118,9 @@ export default function LiveCRM({ user, onStartBooking }: { user: CurrentUser; o
       <Field label="Mobile number *" value={draft.phone} onChange={phone => setDraft({ ...draft, phone })}/>
       <Field label="Interested model / variant *" value={draft.interestedModel} onChange={interestedModel => setDraft({ ...draft, interestedModel })}/>
       <Text style={styles.label}>Branch</Text><Choices items={user.role === 'ADMIN' ? branches : [user.branch || 'Varanasi']} value={draft.branch} choose={branch => setDraft({ ...draft, branch })}/>
-      <Text style={styles.label}>Salesperson</Text><Choices items={user.role === 'SALESPERSON' ? [user.displayName] : salespeople} value={draft.salesperson} choose={salesperson => setDraft({ ...draft, salesperson })}/>
+      <Text style={styles.label}>Salesperson</Text>{user.role === 'SALESPERSON' || branchSalespeople.length
+        ? <Choices items={user.role === 'SALESPERSON' ? [user.displayName] : branchSalespeople} value={draft.salesperson} choose={salesperson => setDraft({ ...draft, salesperson })}/>
+        : <Text style={styles.description}>No salesperson accounts in {draft.branch} yet.</Text>}
       <Text style={styles.label}>Source</Text><Choices items={sources} value={draft.source} choose={source => setDraft({ ...draft, source })}/>
       <Field label="Follow-up date (YYYY-MM-DD)" value={draft.followUpDate || ''} onChange={followUpDate => setDraft({ ...draft, followUpDate: followUpDate || null })}/>
       <Field label="Notes" value={draft.notes || ''} onChange={notes => setDraft({ ...draft, notes })}/>

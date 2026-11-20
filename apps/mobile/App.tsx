@@ -5,13 +5,12 @@ import { CurrentUser, clearLoginCredentials, setUnauthorizedHandler } from './ap
 import LiveInventory from './LiveInventory';
 import LiveCRM from './LiveCRM';
 import { apiConfigured } from './api/enquiries';
-import Inventory from './Inventory';
-import CRM from './CRM';
+import LiveDashboard from './LiveDashboard';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   Pressable, SafeAreaView, ScrollView, StyleSheet, Text,
-  TextInput, View, useWindowDimensions,
+  View, useWindowDimensions,
 } from 'react-native';
 
 type Section = 'Overview' | 'Enquiries' | 'Inventory' | 'Sales' | 'Finance' | 'Users';
@@ -21,22 +20,6 @@ const colors = {
   bg: '#F4F7F8', white: '#FFFFFF', text: '#152F38',
   muted: '#647882', line: '#E3EAED', amber: '#A96510',
 };
-const metrics = [
-  { label: 'Sales this month', value: '24', note: 'Vehicles delivered', tone: '#E6F4EF' },
-  { label: 'Revenue this month', value: '₹18.6L', note: 'Demo sales total', tone: '#E8EFFB' },
-  { label: 'Available stock', value: '68', note: 'Across all branches', tone: '#FDF2DD' },
-  { label: 'Open enquiries', value: '39', note: '11 need follow-up', tone: '#F5EAF5' },
-];
-const enquiries = [
-  { initials: 'RK', name: 'Rahul Kumar', detail: 'Electric scooter • Varanasi', status: 'Follow-up due', color: '#A96510' },
-  { initials: 'FA', name: 'Farhan Ansari', detail: 'High-speed EV • Ghazipur', status: 'Interested', color: '#087D72' },
-  { initials: 'SP', name: 'Sneha Patel', detail: 'Electric scooter • Mau', status: 'New enquiry', color: '#3667B3' },
-];
-const inventory = [
-  { name: 'Electric Scooter — Standard', id: 'CHS-DEMO-001', branch: 'Varanasi', status: 'Available' },
-  { name: 'Electric Scooter — Long Range', id: 'CHS-DEMO-002', branch: 'Ghazipur', status: 'Reserved' },
-  { name: 'Electric Scooter — Premium', id: 'CHS-DEMO-003', branch: 'Mau', status: 'Available' },
-];
 function Label({ children }: { children: React.ReactNode }) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
@@ -50,11 +33,9 @@ export default function App() {
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  const [search, setSearch] = useState('');
   const { width } = useWindowDimensions();
   const wide = width >= 850;
   const visibleSections = session?.role === 'ADMIN' ? [...sections, 'Users' as Section] : sections;
-  const shownEnquiries = enquiries.filter(e => (e.name + e.detail + e.status).toLowerCase().includes(search.toLowerCase()));
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar style="dark" />
@@ -81,8 +62,9 @@ export default function App() {
             <View style={styles.avatar}><Text style={styles.avatarText}>{session ? session.displayName.slice(0, 2).toUpperCase() : 'PE'}</Text></View>
           </View>
           <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Dashboard and Finance use demo data. CRM, Inventory and Sales/Bookings use persistent APIs when configured and signed in.</Text></View>
-            {apiConfigured && !session ? <SessionGate user={session} onSignIn={setSession} /> : <>
+            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Test data only. Development sign-in is not production-ready. Finance is not built yet.</Text></View>
+            {!apiConfigured ? <View style={styles.placeholder}><Text style={styles.placeholderTitle}>API not configured</Text><Text style={styles.placeholderBody}>Set EXPO_PUBLIC_API_URL in apps/mobile/.env.local (see README) and restart Expo.</Text></View>
+            : !session ? <SessionGate user={session} onSignIn={setSession} /> : <>
             {section === 'Overview' && <>
               <View style={[styles.hero, wide && { flexDirection: 'row', alignItems: 'center' }]}>
                 <View style={{ flex: 1 }}>
@@ -92,26 +74,18 @@ export default function App() {
                 </View>
                 <Pressable onPress={() => setSection('Enquiries')} style={styles.heroButton}><Text style={styles.heroButtonText}>View enquiries  →</Text></Pressable>
               </View>
-              <Label>Performance snapshot</Label>
-              <View style={styles.metricGrid}>{metrics.map(m => <View key={m.label} style={[styles.metric, { width: wide ? '23.5%' : '48%' }]}>
-                <View style={[styles.metricAccent, { backgroundColor: m.tone }]}><Text style={styles.metricDot}>●</Text></View>
-                <Text style={styles.metricLabel}>{m.label}</Text><Text style={styles.metricValue}>{m.value}</Text><Text style={styles.metricNote}>{m.note}</Text>
-              </View>)}</View>
+              <LiveDashboard user={session} wide={wide} onOpen={setSection} />
               <Label>Quick access</Label>
               <View style={styles.quickGrid}>{(['Enquiries', 'Inventory', 'Sales', 'Finance'] as Section[]).map(item =>
                 <Pressable key={item} onPress={() => setSection(item)} style={[styles.quick, { width: wide ? '23.5%' : '48%' }]}>
                   <Text style={styles.quickSymbol}>{item === 'Enquiries' ? '◎' : item === 'Inventory' ? '▣' : item === 'Sales' ? '↗' : '₹'}</Text>
                   <Text style={styles.quickTitle}>{item}</Text><Text style={styles.quickArrow}>→</Text>
                 </Pressable>)}</View>
-              <Label>Recent enquiries</Label>
-              {enquiries.map(e => <View key={e.name} style={styles.listRow}><View style={styles.initials}><Text style={styles.initialText}>{e.initials}</Text></View>
-                <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{e.name}</Text><Text style={styles.rowSub}>{e.detail}</Text></View>
-                <Text style={[styles.status, { color: e.color }]}>{e.status}</Text></View>)}
             </>}
-            {section === 'Enquiries' && (apiConfigured && session ? <LiveCRM user={session} onStartBooking={id => { setBookingEnquiryId(id); setSection('Sales'); }} /> : <CRM />)}
-            {section === 'Inventory' && (apiConfigured && session ? <LiveInventory user={session} /> : <Inventory />)}
-            {section === 'Sales' && (apiConfigured && session ? <LiveBookings user={session} enquiryId={bookingEnquiryId} onClearEnquiry={() => setBookingEnquiryId(null)} /> : <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Sales workspace</Text><Text style={styles.placeholderBody}>Bookings and allocations are available when the API is configured. Invoices and deliveries are planned.</Text></View>)}
-            {section === 'Users' && session?.role === 'ADMIN' && apiConfigured && <AdminUsers />}
+            {section === 'Enquiries' && <LiveCRM user={session} onStartBooking={id => { setBookingEnquiryId(id); setSection('Sales'); }} />}
+            {section === 'Inventory' && <LiveInventory user={session} />}
+            {section === 'Sales' && <LiveBookings user={session} enquiryId={bookingEnquiryId} onClearEnquiry={() => setBookingEnquiryId(null)} />}
+            {section === 'Users' && session.role === 'ADMIN' && <AdminUsers />}
             {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
             </>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>

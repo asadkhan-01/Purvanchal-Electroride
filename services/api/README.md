@@ -47,6 +47,7 @@ Current development authentication: `Authorization: Basic <base64(username:passw
 | GET | /api/v1/auth/me | Authenticated user identity and scope |
 | GET | /api/v1/users | Admin-only user listing (no password hashes) |
 | POST | /api/v1/users | Admin-only provisioning |
+| GET | /api/v1/users/salespeople | Salesperson names for enquiry assignment (admin: all, manager: own branch, salesperson: self) |
 
 ### Create three test-role accounts using the Expo UI
 
@@ -85,7 +86,7 @@ Follow-up dates use ISO `YYYY-MM-DD`. Stages are `New`, `Contacted`, `Interested
 
 ## Vehicle inventory API — milestone 7
 
-The vehicle API is now persisted in PostgreSQL. The Expo **LiveInventory** screen now uses these authenticated endpoints when `EXPO_PUBLIC_API_URL` is configured; without that variable, the original inventory demo is displayed. The Expo app now uses one shared development sign-in screen and the same in-memory HTTP Basic transport for CRM and Inventory. Signing out or receiving HTTP 401 clears the in-memory credentials, and a reload requires signing in again.
+The vehicle API is now persisted in PostgreSQL. The Expo **LiveInventory** screen now uses these authenticated endpoints when `EXPO_PUBLIC_API_URL` is configured. The Expo app now uses one shared development sign-in screen and the same in-memory HTTP Basic transport for CRM and Inventory. Signing out or receiving HTTP 401 clears the in-memory credentials, and a reload requires signing in again.
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -187,7 +188,7 @@ GitHub Actions runs `mvn clean verify` on backend changes.
 
 ## Connecting the Expo web preview (development only)
 
-The Expo CRM and Inventory screens use the API only when `EXPO_PUBLIC_API_URL` is configured; otherwise they stay in local demo mode.
+The Expo app requires `EXPO_PUBLIC_API_URL`; there is no local demo mode.
 
 For a Codespaces browser preview:
 
