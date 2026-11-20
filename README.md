@@ -153,7 +153,9 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 11. **Implemented, new CI verification pending — Direct and enquiry-linked bookings:** Flyway V6 migration, direct customer capture without a dummy enquiry, CRM → Sales handoff, authenticated Sales UI, and unit/PostgreSQL tests.
 12. **Implemented, CI verification pending — Quotation and pricing foundation:** immutable quotation per pending booking, exact decimal calculations, manager approval, audit events, PostgreSQL V7 and UI integration. Figures exclude taxes and are NOT final customer prices.
 13. **Implemented, CI pending — Admin user management UI:** create and list test users for the three supported roles from an authenticated Admin-only screen; existing app-wide login remains shared.
-14. **Next —** price lists, quotation revisions, applicable tax/fee modeling and approved final payable totals; then payment receipts, invoices, delivery, GST, accounting, finance reconciliation and production hardening.
+14. **Implemented — Live dashboard and real salesperson picker:** demo data removed.
+15. **Implemented — Payments, receipts, GST invoices and delivery:** numbered receipts (cash/UPI/card/bank/cheque/finance), 269ST cash limit, immutable invoices with CGST/SGST or IGST and round-off, printable invoice/receipt (web), delivery marks stock SOLD, Finance tab with collections and dues. GST treatment needs accountant review.
+16. **Next —** dealer GSTIN/branch details, credit notes and refunds, price lists, accounting and finance reconciliation, production authentication.
 
 ## Safety and compliance
 

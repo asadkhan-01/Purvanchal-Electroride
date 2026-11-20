@@ -79,7 +79,12 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!response.ok) {
     const error = await response.text().catch(() => '');
-    throw new Error('API ' + response.status + ': ' + (error.slice(0, 160) || response.statusText));
+    let message = error.slice(0, 160);
+    try {
+      const parsed = JSON.parse(error) as { detail?: string; title?: string };
+      message = parsed.detail || parsed.title || message;
+    } catch { /* not JSON */ }
+    throw new Error('API ' + response.status + ': ' + (message || response.statusText));
   }
   return await response.json() as T;
 }

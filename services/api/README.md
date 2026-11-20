@@ -141,6 +141,33 @@ Two concurrent bookings cannot allocate the same chassis; database partial uniqu
 
 **Not yet supported:** customer master/deduplication, quotation/prices, booking payment and refund, sale/delivery, invoice/GST, booking expiry, and production authentication. Use test customer data only.
 
+## Payments, receipts, invoices and delivery — milestone 15
+
+Flow: **quotation approved → booking confirmed → payments → GST invoice → full payment → delivery**. Migration `V8__create_billing.sql` adds `payment_receipts`, `invoices`, `document_sequences` and the `DELIVERED` booking status.
+
+| Method | Route | Who | Purpose |
+|---|---|---|---|
+| GET | /api/v1/bookings/{id}/account | anyone who can see the booking | Payable, received, balance, invoice and receipts |
+| POST | /api/v1/bookings/{id}/payments | salesperson (own), manager, admin | Record a payment; returns a numbered receipt |
+| POST | /api/v1/bookings/{id}/payments/{receiptId}/void | manager, admin | Void a receipt with a reason (refund/mistake) |
+| GET | /api/v1/bookings/{id}/invoice | anyone who can see the booking | Read the invoice |
+| POST | /api/v1/bookings/{id}/invoice | manager, admin | Issue the one tax invoice for a confirmed booking |
+| POST | /api/v1/bookings/{id}/deliver | manager, admin | Hand over: booking `DELIVERED`, vehicle `SOLD` |
+| GET | /api/v1/finance/summary?month=YYYY-MM | all roles, scoped | Invoiced, collected, by-mode, outstanding dues, advances, deliveries, dues list, recent receipts |
+
+Rules enforced by the server:
+
+- Payments need an **approved quotation**, a live booking, and may not exceed the balance. Before invoicing, the payable is an estimate (quotation + 5% GST); afterwards it is the invoice total.
+- Modes: `CASH`, `UPI`, `CARD`, `BANK_TRANSFER`, `CHEQUE`, `FINANCE`. Non-cash payments need a reference; finance disbursements need the finance company. **Cumulative cash on one booking must stay below ₹2,00,000** (Income Tax Act s.269ST). Received dates cannot be in the future or before the booking.
+- Receipts are never deleted; managers void them with a reason.
+- Invoices: one per booking, immutable, numbered `INV/<BRANCH>/<FY>/<seq>`; receipts are `RCT/<BRANCH>/<FY>/<seq>`. Numbers are gapless per branch and Indian financial year (April–March).
+- GST: taxable value = approved quotation subtotal. Default rate 5% (EVs); same-state supply splits into CGST + SGST, other-state uses IGST. Total is rounded to the nearest rupee with a round-off line. Optional customer GSTIN is validated (15 characters).
+- An invoiced booking, or one with live receipts, cannot be cancelled (void/refund receipts first; credit notes are not supported yet).
+- Delivery requires the invoice and a zero balance.
+- Error responses use RFC 9457 Problem Details; the reason is in `detail`.
+
+**Not production-ready:** dealer GSTIN/address, HSN codes, e-invoicing (IRN), credit notes, refunds as separate entries, accessory-specific GST rates, subsidies, insurance and registration are not implemented. Have the dealership's accountant review GST treatment before real use.
+
 ## Quotation & pricing — milestone 12
 
 Each pending booking can have **one immutable draft quotation**, optionally approved by the branch manager or administrator. The Expo Sales booking detail now provides fields to save and review quotations and an **Approve quotation** action for managers.

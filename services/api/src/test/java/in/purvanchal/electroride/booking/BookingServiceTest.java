@@ -31,6 +31,8 @@ class BookingServiceTest {
     @Mock VehicleMovementRepository movements;
     @Mock EnquiryAccess enquiryAccess;
     @Mock InventoryPolicy inventoryPolicy;
+    @Mock in.purvanchal.electroride.billing.InvoiceRepository invoices;
+    @Mock in.purvanchal.electroride.billing.PaymentReceiptRepository receipts;
     @InjectMocks BookingService service;
 
     private AppUser actor;

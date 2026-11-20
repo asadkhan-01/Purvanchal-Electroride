@@ -2,6 +2,11 @@ server:
   port: ${PORT:8080}
 
 spring:
+  mvc:
+    # RFC 9457 bodies: deliberate business-rule reasons reach the client as `detail`;
+    # unexpected exceptions still return a generic error without internal messages.
+    problemdetails:
+      enabled: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:electroride}}
     username: ${DB_USER:electroride}
