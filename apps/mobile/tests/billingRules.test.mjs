@@ -24,4 +24,10 @@ test('invoice address, GSTIN and rate are checked', () => {
   assert.match(validateInvoice({ customerAddress: ' ', customerGstin: '', gstRate: '5' }), /address/);
   assert.match(validateInvoice({ customerAddress: 'x', customerGstin: 'ABC', gstRate: '5' }), /GSTIN/);
   assert.match(validateInvoice({ customerAddress: 'x', customerGstin: '', gstRate: '30' }), /GST rate/);
+  const ok = { customerAddress: 'x', customerGstin: '', gstRate: '5' };
+  assert.match(validateInvoice({ ...ok, customerRelation: 'S/o', customerGuardianName: ' ' }), /guardian/);
+  assert.match(validateInvoice({ ...ok, idType: 'PAN', idNumber: '' }), /ID number/);
+  assert.match(validateInvoice({ ...ok, aadhaarLast4: '123412341234' }), /last 4/);
+  assert.match(validateInvoice({ ...ok, subsidy: '10.555' }), /Subsidy/);
+  assert.equal(validateInvoice({ ...ok, customerRelation: 'S/o', customerGuardianName: 'Test', idType: 'PAN', idNumber: 'X1', aadhaarLast4: '1234', subsidy: '5000' }), null);
 });

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { CurrentUser } from './api/enquiries';
 import type { Booking } from './api/bookings';
-import { Account, PaymentMode, billingApi, inr, modeTitle, paymentModes } from './api/billing';
+import { Account, PaymentMode, billingApi, idTitle, idTypes, inr, modeTitle, paymentModes, relations } from './api/billing';
 import { invoiceHtml, printDocument, receiptHtml } from './billingDocs';
 import { validatePayment, validateInvoice } from './billingRules';
 
@@ -28,7 +28,8 @@ export default function BookingBilling({ user, booking, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pay, setPay] = useState({ amount: '', mode: 'UPI' as PaymentMode, reference: '', financeCompany: '', receivedOn: todayIso(), notes: '' });
-  const [inv, setInv] = useState({ customerAddress: '', customerGstin: '', gstRate: '5', interState: false });
+  const [inv, setInv] = useState({ customerAddress: '', customerGstin: '', gstRate: '5', interState: false,
+    customerRelation: '', customerGuardianName: '', idType: '', idNumber: '', aadhaarLast4: '', financier: '', subsidy: '' });
   const [voiding, setVoiding] = useState<number | null>(null);
   const [voidReason, setVoidReason] = useState('');
 
@@ -66,6 +67,11 @@ export default function BookingBilling({ user, booking, onChanged }: {
     void run(() => billingApi.issueInvoice(booking.id, {
       customerAddress: inv.customerAddress.trim(), customerGstin: inv.customerGstin.trim() || undefined,
       gstRate: inv.gstRate.trim(), interState: inv.interState,
+      customerRelation: inv.customerRelation || undefined, customerGuardianName: inv.customerGuardianName.trim() || undefined,
+      idType: inv.idType || undefined, idNumber: inv.idNumber.trim() || undefined,
+      aadhaarLast4: inv.aadhaarLast4.trim() || undefined,
+      financier: (inv.financier.trim() || account?.receipts.find(r => r.status === 'RECEIVED' && r.financeCompany)?.financeCompany) || undefined,
+      subsidy: inv.subsidy.trim() || undefined,
     }), 'Invoice issued');
   };
 
@@ -114,7 +120,7 @@ export default function BookingBilling({ user, booking, onChanged }: {
         </>}
       </View>
       <View style={{ gap: 6 }}>
-        <Pressable onPress={() => { if (!printDocument(receiptHtml(r, booking.customerName))) setError('Printing is available in the web app'); }}><Text style={s.link}>Print</Text></Pressable>
+        <Pressable onPress={() => { if (!printDocument(receiptHtml(r, booking.customerName, account.invoice))) setError('Printing is available in the web app'); }}><Text style={s.link}>Print</Text></Pressable>
         {manager && r.status === 'RECEIVED' && open && voiding !== r.id && <Pressable onPress={() => { setVoiding(r.id); setVoidReason(''); }}><Text style={[s.link, { color: red }]}>Void</Text></Pressable>}
       </View>
     </View>)}
@@ -125,10 +131,28 @@ export default function BookingBilling({ user, booking, onChanged }: {
       <Text style={s.info}>Taxable value {inr(account.invoice.taxableValue)} · GST {account.invoice.gstRate}% {account.invoice.taxType === 'IGST'
         ? 'IGST ' + inr(account.invoice.igst) : 'CGST ' + inr(account.invoice.cgst) + ' + SGST ' + inr(account.invoice.sgst)}</Text>
       <Text style={s.info}>Round off {inr(account.invoice.roundOff)} · Total {inr(account.invoice.grandTotal)}</Text>
-      <Text style={s.info}>{account.invoice.customerAddress}{account.invoice.customerGstin ? ' · GSTIN ' + account.invoice.customerGstin : ''}</Text>
+      <Text style={s.info}>{account.invoice.customerName}{account.invoice.customerRelation ? ' ' + account.invoice.customerRelation + ' ' + account.invoice.customerGuardianName : ''} · {account.invoice.customerAddress}{account.invoice.customerGstin ? ' · GSTIN ' + account.invoice.customerGstin : ''}</Text>
+      {(account.invoice.aadhaarLast4 || account.invoice.idType || account.invoice.financier) && <Text style={s.info}>
+        {[account.invoice.aadhaarLast4 && 'Aadhaar XXXX XXXX ' + account.invoice.aadhaarLast4,
+          account.invoice.idType && idTitle(account.invoice.idType) + ' ' + account.invoice.idNumber,
+          account.invoice.financier && 'Finance: ' + account.invoice.financier].filter(Boolean).join(' · ')}</Text>}
+      {account.invoice.subsidy > 0 && <Text style={s.info}>Less subsidy {inr(account.invoice.subsidy)}</Text>}
       <Pressable onPress={() => { if (!printDocument(invoiceHtml(account.invoice!))) setError('Printing is available in the web app'); }}><Text style={s.link}>Print invoice</Text></Pressable>
     </View> : booking.status === 'CONFIRMED' && manager && account.quotationApproved ? <View style={s.box}>
+      <Text style={s.label}>Relation (S/o, D/o…)</Text>
+      <Chips items={[{ id: '', title: 'None' }, ...relations.map(r => ({ id: r as string, title: r }))]} value={inv.customerRelation}
+        choose={customerRelation => setInv({ ...inv, customerRelation })} />
+      {!!inv.customerRelation && <Input label="Father's / guardian's name *" value={inv.customerGuardianName}
+        change={customerGuardianName => setInv({ ...inv, customerGuardianName })} />}
       <Input label="Customer billing address *" value={inv.customerAddress} change={customerAddress => setInv({ ...inv, customerAddress })} />
+      <Input label="Aadhaar — last 4 digits only" value={inv.aadhaarLast4} change={aadhaarLast4 => setInv({ ...inv, aadhaarLast4 })}
+        hint="Full Aadhaar numbers are not stored" />
+      <Text style={s.label}>Other ID</Text>
+      <Chips items={[{ id: '', title: 'None' }, ...idTypes]} value={inv.idType} choose={idType => setInv({ ...inv, idType })} />
+      {!!inv.idType && <Input label="ID number *" value={inv.idNumber} change={idNumber => setInv({ ...inv, idNumber })} />}
+      <Input label="Bank / finance company" value={inv.financier} change={financier => setInv({ ...inv, financier })}
+        hint={account.receipts.find(r => r.financeCompany)?.financeCompany ?? 'e.g. finance company name'} />
+      <Input label="Less: incentive / subsidy (₹)" value={inv.subsidy} change={subsidy => setInv({ ...inv, subsidy })} hint="0" />
       <Input label="Customer GSTIN (business buyers only)" value={inv.customerGstin} change={customerGstin => setInv({ ...inv, customerGstin })} />
       <Input label="GST rate (%)" value={inv.gstRate} change={gstRate => setInv({ ...inv, gstRate })} hint="5 for electric vehicles" />
       <Text style={s.label}>Place of supply</Text>

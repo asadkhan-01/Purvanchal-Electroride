@@ -40,14 +40,17 @@ public class BillingService {
     private final VehicleMovementRepository movements;
     private final InventoryPolicy policy;
     private final DocumentNumbers numbers;
+    private final DealerProfile dealer;
 
     public BillingService(BookingService bookingService, BookingRepository bookings, BookingEventRepository events,
                           BookingQuotationRepository quotations, InvoiceRepository invoices,
                           PaymentReceiptRepository receipts, VehicleRepository vehicles,
-                          VehicleMovementRepository movements, InventoryPolicy policy, DocumentNumbers numbers) {
+                          VehicleMovementRepository movements, InventoryPolicy policy, DocumentNumbers numbers,
+                          DealerProfile dealer) {
         this.bookingService = bookingService; this.bookings = bookings; this.events = events;
         this.quotations = quotations; this.invoices = invoices; this.receipts = receipts;
         this.vehicles = vehicles; this.movements = movements; this.policy = policy; this.numbers = numbers;
+        this.dealer = dealer;
     }
 
     /** What the customer owes on one booking. Before invoicing, payable is an estimate (quote + default GST). */
@@ -58,7 +61,15 @@ public class BillingService {
     public record PaymentRequest(BigDecimal amount, String mode, String reference, String financeCompany,
                                  LocalDate receivedOn, String notes) {}
 
-    public record InvoiceRequest(String customerAddress, String customerGstin, BigDecimal gstRate, boolean interState) {}
+    public record InvoiceRequest(String customerAddress, String customerGstin, BigDecimal gstRate, boolean interState,
+                                 String customerRelation, String customerGuardianName, String idType, String idNumber,
+                                 String aadhaarLast4, String financier, BigDecimal subsidy) {
+        public InvoiceRequest(String customerAddress, String customerGstin, BigDecimal gstRate, boolean interState) {
+            this(customerAddress, customerGstin, gstRate, interState, null, null, null, null, null, null, null);
+        }
+    }
+    static final Set<String> RELATIONS = Set.of("S/o", "D/o", "W/o", "C/o");
+    static final Set<String> ID_TYPES = Set.of("PAN", "DRIVING_LICENCE", "VOTER_ID", "PASSPORT", "OTHER");
 
     public static LocalDate today() { return LocalDate.now(INDIA); }
 
@@ -170,11 +181,32 @@ public class BillingService {
             gstin = gstin.toUpperCase(Locale.ROOT);
             if (!gstin.matches("[0-9]{2}[A-Z0-9]{13}")) throw bad("Customer GSTIN must be 15 characters");
         }
+        String relation = blankToNull(req.customerRelation());
+        String guardian = blankToNull(req.customerGuardianName());
+        if ((relation == null) != (guardian == null) || (relation != null && !RELATIONS.contains(relation)))
+            throw bad("Give both relation (S/o, D/o, W/o, C/o) and the father's/guardian's name, or neither");
+        String idType = blankToNull(req.idType());
+        String idNumber = blankToNull(req.idNumber());
+        if (idType != null) idType = idType.toUpperCase(Locale.ROOT);
+        if ((idType == null) != (idNumber == null) || (idType != null && !ID_TYPES.contains(idType)))
+            throw bad("Give both ID type " + ID_TYPES + " and ID number, or neither");
+        if (idNumber != null) idNumber = idNumber.toUpperCase(Locale.ROOT);
+        if (idNumber != null && idNumber.length() > 40) throw bad("ID number is too long");
+        String aadhaar = blankToNull(req.aadhaarLast4());
+        if (aadhaar != null && !aadhaar.matches("[0-9]{4}"))
+            throw bad("Enter only the last 4 digits of Aadhaar; the full number is not stored");
+        String financier = blankToNull(req.financier());
+        if (financier != null && financier.length() > 120) throw bad("Financier name is too long");
+        BigDecimal subsidy = req.subsidy() == null || req.subsidy().signum() == 0
+            ? BigDecimal.ZERO.setScale(2) : BillingMath.amount(req.subsidy());
+
         Vehicle vehicle = vehicles.findById(booking.vehicleId).orElseThrow(() -> conflict("Vehicle not found"));
         BigDecimal rate = BillingMath.rate(req.gstRate());
         BillingMath.Tax tax = BillingMath.tax(quote.subtotalExcludingTax, rate, req.interState());
+        BigDecimal grandTotal = tax.grandTotal().subtract(subsidy);
+        if (grandTotal.signum() <= 0) throw bad("Subsidy must be less than the invoice total");
         BigDecimal received = accountOf(booking).received();
-        if (received.compareTo(tax.grandTotal()) > 0)
+        if (received.compareTo(grandTotal) > 0)
             throw conflict("Receipts exceed the invoice total; void the excess receipt first");
 
         LocalDate date = today();
@@ -187,12 +219,24 @@ public class BillingService {
         inv.customerPhone = booking.customerPhone;
         inv.customerAddress = address;
         inv.customerGstin = gstin;
+        inv.customerRelation = relation;
+        inv.customerGuardianName = guardian;
+        inv.idType = idType;
+        inv.idNumber = idNumber;
+        inv.aadhaarLast4 = aadhaar;
+        inv.financier = financier;
+        DealerProfile.Details supplier = dealer.forBranch(booking.branch);
+        inv.dealerGstin = supplier.gstin();
+        inv.dealerAddress = supplier.address();
+        inv.dealerPhone = supplier.phone();
         inv.chassis = vehicle.chassis;
         inv.model = vehicle.model;
         inv.variant = vehicle.variant;
         inv.colour = vehicle.colour;
         inv.motorSerial = vehicle.motorSerial;
-        inv.batterySerial = vehicle.batterySerial;
+        inv.batterySerials = String.join(", ", vehicle.batterySerials);
+        inv.chargerSerial = vehicle.chargerSerial;
+        inv.controllerSerial = vehicle.controllerSerial;
         inv.vehiclePrice = quote.vehiclePrice;
         inv.discount = quote.discount;
         inv.accessories = quote.accessories;
@@ -204,7 +248,8 @@ public class BillingService {
         inv.sgst = tax.sgst();
         inv.igst = tax.igst();
         inv.roundOff = tax.roundOff();
-        inv.grandTotal = tax.grandTotal();
+        inv.subsidy = subsidy;
+        inv.grandTotal = grandTotal;
         inv.issuedBy = actor.username;
         Invoice saved = invoices.save(inv);
         log(booking.id, "INVOICED", actor, saved.invoiceNumber + " · Rs " + saved.grandTotal.toPlainString());

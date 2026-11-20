@@ -17,7 +17,10 @@ export type Receipt = {
 export type Invoice = {
   id: number; bookingId: number; invoiceNumber: string; branch: string; invoiceDate: string;
   customerName: string; customerPhone: string; customerAddress: string; customerGstin: string | null;
-  chassis: string; model: string; variant: string; colour: string | null; motorSerial: string; batterySerial: string;
+  customerRelation: string | null; customerGuardianName: string | null; idType: string | null; idNumber: string | null;
+  aadhaarLast4: string | null; financier: string | null; dealerGstin: string | null; dealerAddress: string | null; dealerPhone: string | null;
+  chassis: string; model: string; variant: string; colour: string | null; motorSerial: string; batterySerials: string;
+  chargerSerial: string; controllerSerial: string; subsidy: number;
   vehiclePrice: number; discount: number; accessories: number; otherCharges: number; taxableValue: number;
   gstRate: number; taxType: 'CGST_SGST' | 'IGST'; cgst: number; sgst: number; igst: number;
   roundOff: number; grandTotal: number; issuedBy: string;
@@ -30,7 +33,15 @@ export type Account = {
 export type PaymentRequest = {
   amount: string; mode: PaymentMode; reference?: string; financeCompany?: string; receivedOn?: string; notes?: string;
 };
-export type InvoiceRequest = { customerAddress: string; customerGstin?: string; gstRate?: string; interState: boolean };
+export type InvoiceRequest = {
+  customerAddress: string; customerGstin?: string; gstRate?: string; interState: boolean;
+  customerRelation?: string; customerGuardianName?: string; idType?: string; idNumber?: string;
+  aadhaarLast4?: string; financier?: string; subsidy?: string;
+};
+export const relations = ['S/o', 'D/o', 'W/o', 'C/o'] as const;
+export const idTypes = [{ id: 'PAN', title: 'PAN' }, { id: 'DRIVING_LICENCE', title: 'Driving licence' },
+  { id: 'VOTER_ID', title: 'Voter ID' }, { id: 'PASSPORT', title: 'Passport' }, { id: 'OTHER', title: 'Other' }];
+export const idTitle = (t: string | null) => idTypes.find(x => x.id === t)?.title ?? t ?? '';
 
 export type Due = {
   bookingId: number; customerName: string; branch: string; salesperson: string; bookingStatus: string;

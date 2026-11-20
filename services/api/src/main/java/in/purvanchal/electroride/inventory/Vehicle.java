@@ -2,6 +2,8 @@ package in.purvanchal.electroride.inventory;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "vehicles")
@@ -15,7 +17,13 @@ public class Vehicle {
     @Column(nullable = false) public String branch;
     @Column(nullable = false) public String status = "AVAILABLE";
     @Column(name = "motor_serial", nullable = false, unique = true) public String motorSerial;
-    @Column(name = "battery_serial", nullable = false, unique = true) public String batterySerial;
+    /** One or more battery pack serials, in fitted order. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "vehicle_batteries", joinColumns = @JoinColumn(name = "vehicle_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "serial", nullable = false)
+    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
+    public List<String> batterySerials = new ArrayList<>();
     @Column(name = "charger_serial", nullable = false, unique = true) public String chargerSerial;
     @Column(name = "controller_serial", nullable = false, unique = true) public String controllerSerial;
     @Column(name = "transfer_destination") public String transferDestination;

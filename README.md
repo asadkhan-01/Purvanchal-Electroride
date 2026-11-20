@@ -155,7 +155,7 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 13. **Implemented, CI pending — Admin user management UI:** create and list test users for the three supported roles from an authenticated Admin-only screen; existing app-wide login remains shared.
 14. **Implemented — Live dashboard and real salesperson picker:** demo data removed.
 15. **Implemented — Payments, receipts, GST invoices and delivery:** numbered receipts (cash/UPI/card/bank/cheque/finance), 269ST cash limit, immutable invoices with CGST/SGST or IGST and round-off, printable invoice/receipt (web), delivery marks stock SOLD, Finance tab with collections and dues. GST treatment needs accountant review.
-16. **Next —** dealer GSTIN/branch details, credit notes and refunds, price lists, accounting and finance reconciliation, production authentication.
+16. **Next —** credit notes and refunds, price lists, accounting and finance reconciliation, production authentication.
 
 ## Safety and compliance
 

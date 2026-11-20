@@ -32,12 +32,24 @@ CREATE TABLE invoices (
   customer_phone VARCHAR(20) NOT NULL,
   customer_address VARCHAR(300) NOT NULL CHECK (length(trim(customer_address)) > 0),
   customer_gstin VARCHAR(15) CHECK (customer_gstin IS NULL OR customer_gstin ~ '^[0-9]{2}[A-Z0-9]{13}$'),
+  customer_relation VARCHAR(3) CHECK (customer_relation IN ('S/o', 'D/o', 'W/o', 'C/o')),
+  customer_guardian_name VARCHAR(160),
+  id_type VARCHAR(20) CHECK (id_type IN ('PAN', 'DRIVING_LICENCE', 'VOTER_ID', 'PASSPORT', 'OTHER')),
+  id_number VARCHAR(40),
+  -- Only the last four Aadhaar digits are kept (UIDAI masking); never the full number.
+  aadhaar_last4 VARCHAR(4) CHECK (aadhaar_last4 ~ '^[0-9]{4}$'),
+  financier VARCHAR(120),
+  dealer_gstin VARCHAR(15),
+  dealer_address VARCHAR(300),
+  dealer_phone VARCHAR(20),
   chassis VARCHAR(100) NOT NULL,
   model VARCHAR(160) NOT NULL,
   variant VARCHAR(120) NOT NULL,
   colour VARCHAR(80),
   motor_serial VARCHAR(120) NOT NULL,
-  battery_serial VARCHAR(120) NOT NULL,
+  battery_serials VARCHAR(800) NOT NULL,
+  charger_serial VARCHAR(120) NOT NULL,
+  controller_serial VARCHAR(120) NOT NULL,
   vehicle_price NUMERIC(14,2) NOT NULL,
   discount NUMERIC(14,2) NOT NULL,
   accessories NUMERIC(14,2) NOT NULL,
@@ -49,6 +61,7 @@ CREATE TABLE invoices (
   sgst NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (sgst >= 0),
   igst NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (igst >= 0),
   round_off NUMERIC(4,2) NOT NULL CHECK (round_off > -1 AND round_off < 1),
+  subsidy NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (subsidy >= 0),
   grand_total NUMERIC(14,2) NOT NULL CHECK (grand_total > 0),
   issued_by VARCHAR(80) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -58,7 +71,9 @@ CREATE TABLE invoices (
     (tax_type = 'CGST_SGST' AND igst = 0 AND cgst = sgst)
     OR (tax_type = 'IGST' AND cgst = 0 AND sgst = 0)),
   CONSTRAINT invoice_total_consistent CHECK (
-    grand_total = taxable_value + cgst + sgst + igst + round_off)
+    grand_total = taxable_value + cgst + sgst + igst + round_off - subsidy),
+  CONSTRAINT invoice_id_consistent CHECK ((id_type IS NULL) = (id_number IS NULL)),
+  CONSTRAINT invoice_relation_consistent CHECK ((customer_relation IS NULL) = (customer_guardian_name IS NULL))
 );
 CREATE INDEX idx_invoices_branch_date ON invoices(branch, invoice_date);
 

@@ -1,6 +1,10 @@
 // Client-side checks for faster feedback only; the API enforces every rule.
 type PaymentDraft = { amount: string; mode: string; reference: string; financeCompany: string; receivedOn: string };
-type InvoiceDraft = { customerAddress: string; customerGstin: string; gstRate: string };
+type InvoiceDraft = {
+  customerAddress: string; customerGstin: string; gstRate: string;
+  customerRelation?: string; customerGuardianName?: string; idType?: string; idNumber?: string;
+  aadhaarLast4?: string; subsidy?: string;
+};
 
 const money = /^(0|[1-9]\d{0,11})(\.\d{1,2})?$/;
 
@@ -20,5 +24,11 @@ export function validateInvoice(i: InvoiceDraft): string | null {
   if (gstin && !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstin)) return 'GSTIN must be 15 characters starting with the 2-digit state code.';
   const rate = i.gstRate.trim();
   if (!/^\d{1,2}(\.\d{1,2})?$/.test(rate) || Number(rate) > 28) return 'GST rate must be between 0 and 28.';
+  if (i.customerRelation && !(i.customerGuardianName ?? '').trim()) return "Enter the father's / guardian's name.";
+  if (i.idType && !(i.idNumber ?? '').trim()) return 'Enter the ID number for the selected ID type.';
+  const aadhaar = (i.aadhaarLast4 ?? '').trim();
+  if (aadhaar && !/^\d{4}$/.test(aadhaar)) return 'Enter only the last 4 digits of Aadhaar.';
+  const subsidy = (i.subsidy ?? '').trim();
+  if (subsidy && !money.test(subsidy)) return 'Subsidy must be an amount with at most two decimals.';
   return null;
 }

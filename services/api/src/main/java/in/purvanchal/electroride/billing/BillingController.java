@@ -27,7 +27,10 @@ public class BillingController {
                               LocalDate receivedOn, @Size(max = 300) String notes) {}
     public record VoidBody(@NotBlank @Size(max = 300) String reason) {}
     public record InvoiceBody(@NotBlank @Size(max = 300) String customerAddress, @Size(max = 15) String customerGstin,
-                              BigDecimal gstRate, boolean interState) {}
+                              BigDecimal gstRate, boolean interState,
+                              @Size(max = 3) String customerRelation, @Size(max = 160) String customerGuardianName,
+                              @Size(max = 20) String idType, @Size(max = 40) String idNumber,
+                              @Size(max = 4) String aadhaarLast4, @Size(max = 120) String financier, BigDecimal subsidy) {}
 
     @GetMapping("/account")
     public BillingService.Account account(@PathVariable Long bookingId, Authentication auth) {
@@ -56,7 +59,9 @@ public class BillingController {
     @ResponseStatus(HttpStatus.CREATED)
     public Invoice issue(@PathVariable Long bookingId, @Valid @RequestBody InvoiceBody b, Authentication auth) {
         return service.issueInvoice(bookingId, new BillingService.InvoiceRequest(
-            b.customerAddress(), b.customerGstin(), b.gstRate(), b.interState()), access.current(auth));
+            b.customerAddress(), b.customerGstin(), b.gstRate(), b.interState(), b.customerRelation(),
+            b.customerGuardianName(), b.idType(), b.idNumber(), b.aadhaarLast4(), b.financier(), b.subsidy()),
+            access.current(auth));
     }
 
     @PostMapping("/deliver")

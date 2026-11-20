@@ -37,9 +37,12 @@ test('only destination manager or admin can receive in-transit stock', () => {
 test('registration requires all serials and chassis details', () => {
   const valid = {
     chassis: 'TEST-1', model: 'EV', variant: 'Standard', branch: 'Varanasi',
-    motorSerial: 'M1', batterySerial: 'B1', chargerSerial: 'C1', controllerSerial: 'CTL1',
+    motorSerial: 'M1', batterySerials: ['B1', 'B2'], chargerSerial: 'C1', controllerSerial: 'CTL1',
   };
   assert.equal(isRegistrationComplete(valid), true);
-  assert.equal(isRegistrationComplete({ ...valid, batterySerial: ' ' }), false);
+  assert.equal(isRegistrationComplete({ ...valid, batterySerials: ['B1', ' '] }), false);
+  assert.equal(isRegistrationComplete({ ...valid, batterySerials: [] }), false);
+  assert.equal(isRegistrationComplete({ ...valid, batterySerials: ['B1', 'b1'] }), false);
+  assert.equal(isRegistrationComplete({ ...valid, batterySerials: ['B1'] }), true);
   assert.equal(isRegistrationComplete({ ...valid, chassis: '' }), false);
 });

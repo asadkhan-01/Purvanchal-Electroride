@@ -165,8 +165,12 @@ Rules enforced by the server:
 - An invoiced booking, or one with live receipts, cannot be cancelled (void/refund receipts first; credit notes are not supported yet).
 - Delivery requires the invoice and a zero balance.
 - Error responses use RFC 9457 Problem Details; the reason is in `detail`.
+- Invoices also record (all optional): relation and father's/guardian's name (S/o, D/o, W/o, C/o), another ID (PAN, driving licence, voter ID, passport), **only the last 4 Aadhaar digits** (full Aadhaar numbers are never stored), financier, and a subsidy/incentive deducted after GST. Vehicle frame, motor, every battery, charger and controller serials are copied onto the invoice.
+- Dealer details printed on invoices come from environment settings, not code: `DEALER_GSTIN`, `DEALER_PHONE`, `DEALER_ADDRESS`, with optional per-branch `DEALER_ADDRESS_<BRANCH>` / `DEALER_PHONE_<BRANCH>` (e.g. `DEALER_ADDRESS_GHAZIPUR`). They are copied onto each invoice when issued.
 
-**Not production-ready:** dealer GSTIN/address, HSN codes, e-invoicing (IRN), credit notes, refunds as separate entries, accessory-specific GST rates, subsidies, insurance and registration are not implemented. Have the dealership's accountant review GST treatment before real use.
+**Multiple batteries (V9 migration):** a vehicle has one or more battery packs (`batterySerials: [...]`, up to 6), stored in `vehicle_batteries`; each serial is unique across all stock. The single `batterySerial` field is still accepted when registering.
+
+**Not production-ready:** HSN codes, e-invoicing (IRN), credit notes, refunds as separate entries, accessory-specific GST rates, insurance and registration are not implemented. Have the dealership's accountant review GST (including how subsidies are shown) before real use.
 
 ## Quotation & pricing — milestone 12
 

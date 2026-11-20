@@ -85,7 +85,7 @@ class BookingPersistenceIT {
         v.variant = "Standard";
         v.branch = "Varanasi";
         v.motorSerial = "M-" + token;
-        v.batterySerial = "B-" + token;
+        v.batterySerials = new java.util.ArrayList<>(java.util.List.of("B-" + token));
         v.chargerSerial = "C-" + token;
         v.controllerSerial = "CTL-" + token;
         return vehicles.save(v);

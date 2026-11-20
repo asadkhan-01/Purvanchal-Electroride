@@ -22,6 +22,14 @@ services:
         value: admin
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
+      # Printed on invoices and receipts. Optional per-branch overrides:
+      # DEALER_ADDRESS_GHAZIPUR, DEALER_ADDRESS_VARANASI, DEALER_PHONE_<BRANCH>.
+      - key: DEALER_GSTIN
+        sync: false
+      - key: DEALER_PHONE
+        sync: false
+      - key: DEALER_ADDRESS
+        sync: false
 
 databases:
   - name: electroride-db

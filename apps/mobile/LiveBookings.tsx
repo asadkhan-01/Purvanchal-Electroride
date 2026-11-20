@@ -40,6 +40,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   const [events, setEvents] = useState<BookingEvent[]>([]);
   const [reason, setReason] = useState('');
   const [quotation, setQuotation] = useState<BookingQuotation | null>(null);
+  const [inclusive, setInclusive] = useState('');
   const [quoteFields, setQuoteFields] = useState({
     vehiclePrice: '', discount: '0', accessories: '0', otherCharges: '0',
   });
@@ -187,6 +188,10 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
           </Pressable>}
       </> : active.status === 'PENDING' ? <>
         <Text style={s.info}>Enter amounts in INR before GST. GST is added on the invoice; insurance, registration and subsidy are not included.</Text>
+        <Input label="Price including 5% GST (optional helper)" value={inclusive}
+          change={value => { setInclusive(value); const n = Number(value);
+            if (/^\d+(\.\d{1,2})?$/.test(value.trim()) && n > 0) setQuoteFields(prev => ({ ...prev, vehiclePrice: (n / 1.05).toFixed(2) })); }}
+          hint="e.g. 50000 → vehicle price 47619.05" />
         <Input label="Vehicle price (₹) *" value={quoteFields.vehiclePrice}
           change={vehiclePrice => setQuoteFields(prev => ({ ...prev, vehiclePrice }))} />
         <Input label="Dealer discount (₹)" value={quoteFields.discount}

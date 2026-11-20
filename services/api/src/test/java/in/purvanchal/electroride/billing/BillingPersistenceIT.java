@@ -36,6 +36,10 @@ class BillingPersistenceIT {
         p.add("spring.datasource.url", postgres::getJdbcUrl);
         p.add("spring.datasource.username", postgres::getUsername);
         p.add("spring.datasource.password", postgres::getPassword);
+        p.add("DEALER_GSTIN", () -> "09TESTX0000X1Z0");
+        p.add("DEALER_ADDRESS", () -> "Test Road, Varanasi");
+        p.add("DEALER_ADDRESS_GHAZIPUR", () -> "Test Market, Ghazipur");
+        p.add("DEALER_PHONE", () -> "9000000000");
     }
 
     static final String PW = "billing-test-password-123";
@@ -80,7 +84,7 @@ class BillingPersistenceIT {
         String chassis = "BILL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         Vehicle v = new Vehicle();
         v.chassis = chassis; v.model = "City Glide"; v.variant = "Standard"; v.colour = "White"; v.branch = "Varanasi";
-        v.motorSerial = "M" + chassis; v.batterySerial = "B" + chassis; v.chargerSerial = "C" + chassis; v.controllerSerial = "K" + chassis;
+        v.motorSerial = "M" + chassis; v.batterySerials = new java.util.ArrayList<>(java.util.List.of("B1" + chassis, "B2" + chassis)); v.chargerSerial = "C" + chassis; v.controllerSerial = "K" + chassis;
         vehicles.save(v);
         Enquiry e = new Enquiry();
         e.customerName = "Billing Customer"; e.phone = "9000000500"; e.branch = "Varanasi";
@@ -208,5 +212,34 @@ class BillingPersistenceIT {
         assertThat(post("bill-sales", b + "/payments", pay("49999", "CASH", null)).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(post("bill-sales", b + "/payments", pay("62501", "UPI", "UTR-77")).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(get("bill-sales", b + "/account").getBody().get("balance").toString()).isEqualTo("0.0");
+    }
+
+    @Test
+    void invoiceCarriesKycSubsidyDealerAndAllBatteries() {
+        long id = quotedBooking();
+        String b = "/api/v1/bookings/" + id;
+        assertThat(post("bill-manager", b + "/confirm", null).getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> base = new java.util.HashMap<>(Map.of("customerAddress", "Test Village, Ghazipur",
+            "customerRelation", "S/o", "customerGuardianName", "Test Father", "idType", "pan", "idNumber", "abcde1234f",
+            "financier", "Test Finance Ltd", "subsidy", "5000"));
+        base.put("aadhaarLast4", "123412341234");
+        assertThat(post("bill-manager", b + "/invoice", base).getStatusCode()).as("full Aadhaar refused").isEqualTo(HttpStatus.BAD_REQUEST);
+        base.put("aadhaarLast4", "1234");
+        base.put("customerRelation", "X/o");
+        assertThat(post("bill-manager", b + "/invoice", base).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        base.put("customerRelation", "S/o");
+        ResponseEntity<Map> inv = post("bill-manager", b + "/invoice", base);
+        assertThat(inv.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Map body = inv.getBody();
+        assertThat(body.get("grandTotal").toString()).isEqualTo("94750.0"); // 99,750 - 5,000 subsidy
+        assertThat(body.get("subsidy").toString()).isEqualTo("5000.0");
+        assertThat(body.get("idType")).isEqualTo("PAN");
+        assertThat(body.get("idNumber")).isEqualTo("ABCDE1234F");
+        assertThat(body.get("aadhaarLast4")).isEqualTo("1234");
+        assertThat(body.get("dealerGstin")).isEqualTo("09TESTX0000X1Z0");
+        assertThat(body.get("dealerAddress")).isEqualTo("Test Road, Varanasi");
+        assertThat(body.get("batterySerials").toString()).contains(", ");
+        assertThat(body.get("chargerSerial").toString()).startsWith("C");
+        assertThat(get("bill-sales", b + "/account").getBody().get("payable").toString()).isEqualTo("94750.0");
     }
 }
