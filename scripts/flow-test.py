@@ -16,7 +16,8 @@ run-specific suffix so they never collide.
 import base64, json, os, ssl, sys, time, urllib.error, urllib.request
 
 BASE = os.environ["BASE_URL"].rstrip("/")
-ADMIN = (os.environ.get("ADMIN_USER", "admin"), os.environ["ADMIN_PASSWORD"])
+# Without ADMIN_PASSWORD, admin calls carry no Authorization header (for a proxy that injects it).
+ADMIN = (os.environ.get("ADMIN_USER", "admin"), os.environ.get("ADMIN_PASSWORD"))
 PW = os.environ["TEST_PASSWORD"]
 assert len(PW) >= 12, "TEST_PASSWORD must be at least 12 characters"
 RUN = time.strftime("%m%d%H%M")
@@ -28,8 +29,9 @@ def call(who, method, path, body=None):
     req = urllib.request.Request(BASE + path, method=method,
         data=None if body is None else json.dumps(body).encode())
     req.add_header("Content-Type", "application/json")
-    token = base64.b64encode(f"{who[0]}:{who[1]}".encode()).decode()
-    req.add_header("Authorization", "Basic " + token)
+    if who[1] is not None:
+        token = base64.b64encode(f"{who[0]}:{who[1]}".encode()).decode()
+        req.add_header("Authorization", "Basic " + token)
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=90) as r:
             raw = r.read()
