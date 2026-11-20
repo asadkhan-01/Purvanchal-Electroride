@@ -10,7 +10,6 @@ import PastSale from './PastSale';
 
 type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
-const salesNote = 'Quotation → confirmation → payments → GST invoice → delivery. GST treatment needs accountant review before real use'
 
 function Input({ label, value, change, hint }: {
   label: string; value: string; change: (value: string) => void; hint?: string;
@@ -159,7 +158,6 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   };
 
   return <View style={s.root}>
-    <View style={s.banner}><Text style={s.bannerText}>DEVELOPMENT SALES · {salesNote}. Use test customer details only.</Text></View>
     <Text style={s.heading}>Sales & Bookings</Text>
     <Text style={s.sub}>{user.displayName} · {user.role} · {user.branch || 'All branches'}</Text>
     <View style={s.actions}><Pressable onPress={() => void reload()} disabled={busy} style={s.secondary}>

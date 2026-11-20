@@ -28,6 +28,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class EnquiryPersistenceIT {
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate testBranchesJdbc;
+
+    /** The seeded branches are the real ones; tests use their own test branches. */
+    @BeforeEach
+    void testBranches() {
+        for (String b : java.util.List.of("Varanasi", "Ghazipur"))
+            testBranchesJdbc.update("INSERT INTO branches (name, invoice_address) VALUES (?, ?) ON CONFLICT DO NOTHING", b, "Test address, " + b);
+    }
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
         .withDatabaseName("electroride_test")

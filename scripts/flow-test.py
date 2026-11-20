@@ -61,11 +61,11 @@ me = check("admin identity", admin, "GET", "/api/v1/auth/me")
 
 print("\n== 1. Accounts (admin only)")
 accounts = [
-    ("mgr.varanasi", "Varanasi Manager", "BRANCH_MANAGER", "Varanasi"),
-    ("sales.asha", "Asha Verma", "SALESPERSON", "Varanasi"),
-    ("sales.ravi", "Ravi Yadav", "SALESPERSON", "Varanasi"),
-    ("mgr.ghazipur", "Ghazipur Manager", "BRANCH_MANAGER", "Ghazipur"),
-    ("sales.imran", "Imran Khan", "SALESPERSON", "Ghazipur"),
+    ("mgr.varanasi", "Varanasi Manager", "BRANCH_MANAGER", "Naini-Prayagraj"),
+    ("sales.asha", "Asha Verma", "SALESPERSON", "Naini-Prayagraj"),
+    ("sales.ravi", "Ravi Yadav", "SALESPERSON", "Naini-Prayagraj"),
+    ("mgr.ghazipur", "Ghazipur Manager", "BRANCH_MANAGER", "Atraoli-Ghazipur"),
+    ("sales.imran", "Imran Khan", "SALESPERSON", "Atraoli-Ghazipur"),
 ]
 for username, name, role, branch in accounts:
     check(f"create {role} {username}", admin, "POST", "/api/v1/users",
@@ -86,26 +86,26 @@ def vehicle(chassis, model, variant, colour, branch):
             "chargerSerial": f"CHG-{chassis}", "controllerSerial": f"CTL-{chassis}"}
 V = lambda n: f"VNS-{RUN}-{n}"
 G = lambda n: f"GZP-{RUN}-{n}"
-check("register 3 Varanasi vehicles", admin, "POST", "/api/v1/inventory", vehicle(V(1), "City Glide", "Standard", "White", "Varanasi"))
-check("  …", admin, "POST", "/api/v1/inventory", vehicle(V(2), "City Glide", "Long Range", "Blue", "Varanasi"))
-check("  …", admin, "POST", "/api/v1/inventory", vehicle(V(3), "Cargo Pro", "Loader", "Grey", "Varanasi"))
-check("manager registers own-branch vehicle", mv, "POST", "/api/v1/inventory", vehicle(V(4), "City Glide", "Premium", "Black", "Varanasi"))
-check("manager registers Ghazipur vehicle", mg, "POST", "/api/v1/inventory", vehicle(G(1), "City Glide", "Standard", "Red", "Ghazipur"))
-check("manager cannot register in other branch", mv, "POST", "/api/v1/inventory", vehicle(G(9), "X", "X", "X", "Ghazipur"), expect=403)
-check("salesperson cannot register", asha, "POST", "/api/v1/inventory", vehicle(V(9), "X", "X", "X", "Varanasi"), expect=403)
-check("duplicate chassis rejected", admin, "POST", "/api/v1/inventory", vehicle(V(1), "X", "X", "X", "Varanasi"), expect=409)
+check("register 3 Varanasi vehicles", admin, "POST", "/api/v1/inventory", vehicle(V(1), "City Glide", "Standard", "White", "Naini-Prayagraj"))
+check("  …", admin, "POST", "/api/v1/inventory", vehicle(V(2), "City Glide", "Long Range", "Blue", "Naini-Prayagraj"))
+check("  …", admin, "POST", "/api/v1/inventory", vehicle(V(3), "Cargo Pro", "Loader", "Grey", "Naini-Prayagraj"))
+check("manager registers own-branch vehicle", mv, "POST", "/api/v1/inventory", vehicle(V(4), "City Glide", "Premium", "Black", "Naini-Prayagraj"))
+check("manager registers Ghazipur vehicle", mg, "POST", "/api/v1/inventory", vehicle(G(1), "City Glide", "Standard", "Red", "Atraoli-Ghazipur"))
+check("manager cannot register in other branch", mv, "POST", "/api/v1/inventory", vehicle(G(9), "X", "X", "X", "Atraoli-Ghazipur"), expect=403)
+check("salesperson cannot register", asha, "POST", "/api/v1/inventory", vehicle(V(9), "X", "X", "X", "Naini-Prayagraj"), expect=403)
+check("duplicate chassis rejected", admin, "POST", "/api/v1/inventory", vehicle(V(1), "X", "X", "X", "Naini-Prayagraj"), expect=409)
 
 print("\n== 3. Enquiries")
 def enquiry(name, phone, branch, sp, model, source="Walk-in"):
     return {"customerName": name, "phone": phone, "branch": branch, "salesperson": sp,
             "source": source, "interestedModel": model, "notes": f"flow test {RUN}"}
-e1 = check("manager creates enquiry for Asha", mv, "POST", "/api/v1/enquiries", enquiry(f"Test Customer A {RUN}", "9000000101", "Varanasi", "Asha Verma", "City Glide"))
-e2 = check("Asha creates own enquiry", asha, "POST", "/api/v1/enquiries", enquiry(f"Test Customer B {RUN}", "9000000102", "Varanasi", "Asha Verma", "Cargo Pro", "Phone"))
-e3 = check("Ravi creates own enquiry", ravi, "POST", "/api/v1/enquiries", enquiry(f"Test Customer C {RUN}", "9000000103", "Varanasi", "Ravi Yadav", "City Glide", "Website"))
-e4 = check("admin creates Ghazipur enquiry for Imran", admin, "POST", "/api/v1/enquiries", enquiry(f"Test Customer D {RUN}", "9000000104", "Ghazipur", "Imran Khan", "City Glide", "Referral"))
-check("Asha cannot assign to Ravi", asha, "POST", "/api/v1/enquiries", enquiry("X", "9000000199", "Varanasi", "Ravi Yadav", "X"), expect=403)
-check("Varanasi manager cannot create in Ghazipur", mv, "POST", "/api/v1/enquiries", enquiry("X", "9000000198", "Ghazipur", "Imran Khan", "X"), expect=403)
-check("invalid phone rejected", admin, "POST", "/api/v1/enquiries", enquiry("X", "123", "Varanasi", "Asha Verma", "X"), expect=400)
+e1 = check("manager creates enquiry for Asha", mv, "POST", "/api/v1/enquiries", enquiry(f"Test Customer A {RUN}", "9000000101", "Naini-Prayagraj", "Asha Verma", "City Glide"))
+e2 = check("Asha creates own enquiry", asha, "POST", "/api/v1/enquiries", enquiry(f"Test Customer B {RUN}", "9000000102", "Naini-Prayagraj", "Asha Verma", "Cargo Pro", "Phone"))
+e3 = check("Ravi creates own enquiry", ravi, "POST", "/api/v1/enquiries", enquiry(f"Test Customer C {RUN}", "9000000103", "Naini-Prayagraj", "Ravi Yadav", "City Glide", "Website"))
+e4 = check("admin creates Ghazipur enquiry for Imran", admin, "POST", "/api/v1/enquiries", enquiry(f"Test Customer D {RUN}", "9000000104", "Atraoli-Ghazipur", "Imran Khan", "City Glide", "Referral"))
+check("Asha cannot assign to Ravi", asha, "POST", "/api/v1/enquiries", enquiry("X", "9000000199", "Naini-Prayagraj", "Ravi Yadav", "X"), expect=403)
+check("Varanasi manager cannot create in Ghazipur", mv, "POST", "/api/v1/enquiries", enquiry("X", "9000000198", "Atraoli-Ghazipur", "Imran Khan", "X"), expect=403)
+check("invalid phone rejected", admin, "POST", "/api/v1/enquiries", enquiry("X", "123", "Naini-Prayagraj", "Asha Verma", "X"), expect=400)
 check("Ravi cannot see Asha's enquiry", ravi, "GET", f"/api/v1/enquiries/{e1['id']}", expect=404)
 check("Ghazipur manager cannot see Varanasi enquiry", mg, "GET", f"/api/v1/enquiries/{e1['id']}", expect=404)
 check("Asha moves enquiry to Contacted", asha, "PATCH", f"/api/v1/enquiries/{e1['id']}/stage", {"stage": "Contacted"})
@@ -145,7 +145,7 @@ print("\n== 5. Reservation and branch transfer")
 check("manager reserves V3", mv, "POST", f"/api/v1/inventory/{V(3)}/reserve")
 check("manager releases V3", mv, "POST", f"/api/v1/inventory/{V(3)}/release")
 check("salesperson cannot reserve", asha, "POST", f"/api/v1/inventory/{V(3)}/reserve", expect=403)
-check("manager transfers V4 to Ghazipur", mv, "POST", f"/api/v1/inventory/{V(4)}/transfer", {"destination": "Ghazipur"})
+check("manager transfers V4 to Ghazipur", mv, "POST", f"/api/v1/inventory/{V(4)}/transfer", {"destination": "Atraoli-Ghazipur"})
 check("source manager cannot receive", mv, "POST", f"/api/v1/inventory/{V(4)}/receive", expect=(403, 409))
 check("Ghazipur manager receives V4", mg, "POST", f"/api/v1/inventory/{V(4)}/receive")
 check("movement history", mg, "GET", f"/api/v1/inventory/{V(4)}/movements")

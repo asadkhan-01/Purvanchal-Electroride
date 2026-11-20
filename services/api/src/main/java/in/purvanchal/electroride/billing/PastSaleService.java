@@ -42,11 +42,13 @@ public class PastSaleService {
     private final AppUserRepository users;
     private final InventoryPolicy policy;
     private final JdbcTemplate jdbc;
+    private final in.purvanchal.electroride.branch.Branches branchCheck;
 
     public PastSaleService(BillingService billing, BookingRepository bookings, BookingQuotationRepository quotations,
                            InvoiceRepository invoices, PaymentReceiptRepository receipts, VehicleRepository vehicles,
                            VehicleMovementRepository movements, AppUserRepository users, InventoryPolicy policy,
-                           JdbcTemplate jdbc) {
+                           JdbcTemplate jdbc, in.purvanchal.electroride.branch.Branches branchCheck) {
+        this.branchCheck = branchCheck;
         this.billing = billing; this.bookings = bookings; this.quotations = quotations; this.invoices = invoices;
         this.receipts = receipts; this.vehicles = vehicles; this.movements = movements; this.users = users;
         this.policy = policy; this.jdbc = jdbc;
@@ -68,6 +70,7 @@ public class PastSaleService {
         String branch = trim(r.branch());
         if (branch == null) throw bad("Branch is required");
         policy.requireManager(actor, branch);
+        branchCheck.requireActive(branch);
         LocalDate today = BillingService.today();
 
         if (r.customer() == null) throw bad("Customer details (address etc.) are required");

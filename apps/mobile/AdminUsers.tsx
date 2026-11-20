@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { usersApi, UserView, NewUser } from './api/users';
-import { branchNames, userRoles, validateNewUser } from './userRules';
+import { userRoles, validateNewUser } from './userRules';
+import { useBranches } from './api/branches';
 
 const teal = '#087D72', ink = '#18343D', border = '#DCE6E9';
 const empty: NewUser = {
   username: '', password: '', displayName: '',
-  role: 'SALESPERSON', branch: 'Varanasi',
+  role: 'SALESPERSON', branch: '',
 };
 
 function Field({ label, value, onChange, secure = false }: {
@@ -18,8 +19,10 @@ function Field({ label, value, onChange, secure = false }: {
 }
 
 export default function AdminUsers() {
+  const branchNames = useBranches();
   const [users, setUsers] = useState<UserView[]>([]);
   const [draft, setDraft] = useState<NewUser>({ ...empty });
+  useEffect(() => { if (draft.role !== 'ADMIN' && !draft.branch && branchNames.length) setDraft(d => ({ ...d, branch: d.branch || branchNames[0] })); }, [branchNames]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -54,10 +57,7 @@ export default function AdminUsers() {
 
   return <View style={styles.root}>
     <Text style={styles.heading}>User administration</Text>
-    <Text style={styles.sub}>Create test accounts for each role. Only administrators can access this API.</Text>
-    <View style={styles.warning}><Text style={styles.warningText}>
-      DEVELOPMENT ONLY · Use synthetic identities and unique test passwords. HTTP Basic authentication is not production-ready.
-    </Text></View>
+    <Text style={styles.sub}>Create accounts for branch managers and salespeople.</Text>
     {!!error && <Text style={styles.error}>{error}</Text>}
     {!!notice && <Text style={styles.success}>{notice}</Text>}
     {busy && <ActivityIndicator color={teal}/>}
@@ -69,7 +69,7 @@ export default function AdminUsers() {
         onChange={password => setDraft(p => ({ ...p, password }))} secure/>
       <Text style={styles.label}>Role</Text>
       <View style={styles.options}>{userRoles.map(role => <Pressable key={role}
-        onPress={() => setDraft(p => ({ ...p, role, branch: role === 'ADMIN' ? null : (p.branch || 'Varanasi') }))}
+        onPress={() => setDraft(p => ({ ...p, role, branch: role === 'ADMIN' ? null : (p.branch || branchNames[0] || '') }))}
         style={[styles.choice, draft.role === role && styles.selected]}>
         <Text style={[styles.choiceText, draft.role === role && styles.selectedText]}>
           {role === 'ADMIN' ? 'Admin' : role === 'BRANCH_MANAGER' ? 'Branch Manager' : 'Salesperson'}

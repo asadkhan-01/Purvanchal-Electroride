@@ -1,7 +1,6 @@
 import type { NewUser } from './api/users';
 
 export const userRoles = ['ADMIN', 'BRANCH_MANAGER', 'SALESPERSON'] as const;
-export const branchNames = ['Varanasi', 'Ghazipur', 'Mau'] as const;
 
 export function validateNewUser(user: NewUser): string | null {
   if (!user.username.trim() || !/^[a-zA-Z0-9._-]{3,80}$/.test(user.username.trim()))
@@ -13,6 +12,6 @@ export function validateNewUser(user: NewUser): string | null {
   if (user.role !== 'ADMIN' && !user.branch?.trim())
     return 'Branch is required for managers and salespeople.';
   if (user.password.length < 12 || !/^[\x20-\x7E]+$/.test(user.password))
-    return 'Use at least 12 printable ASCII characters for the development password.';
+    return 'Use at least 12 printable ASCII characters for the password.';
   return null;
 }

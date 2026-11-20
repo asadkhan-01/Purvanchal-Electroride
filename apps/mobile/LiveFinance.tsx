@@ -35,7 +35,6 @@ export default function LiveFinance({ user, wide, onOpenSales }: { user: Current
   const modes = Object.entries(data.collectedByMode);
 
   return <View>
-    <View style={s.banner}><Text style={s.bannerText}>DEVELOPMENT FINANCE · Figures come from recorded receipts and invoices. GST treatment needs accountant review.</Text></View>
     <Text style={s.scope}>{user.displayName} · {user.role.replace('_', ' ')} · {user.branch ?? 'All branches'}</Text>
     <View style={s.monthRow}>
       <Pressable onPress={() => setMonth(shift(data.month, -1))} style={s.monthBtn}><Text style={s.link}>‹ Prev</Text></Pressable>

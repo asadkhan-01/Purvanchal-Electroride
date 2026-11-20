@@ -17,8 +17,11 @@ public class UserController {
     private final AppUserRepository users;
     private final PasswordEncoder encoder;
     private final EnquiryAccess access;
+    private final in.purvanchal.electroride.branch.Branches branchCheck;
 
-    public UserController(AppUserRepository users, PasswordEncoder encoder, EnquiryAccess access) {
+    public UserController(AppUserRepository users, PasswordEncoder encoder, EnquiryAccess access,
+                          in.purvanchal.electroride.branch.Branches branchCheck) {
+        this.branchCheck = branchCheck;
         this.users = users;
         this.encoder = encoder;
         this.access = access;
@@ -79,6 +82,7 @@ public class UserController {
         if (!"ADMIN".equals(input.role()) && (branch == null || branch.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch required");
         }
+        if (!"ADMIN".equals(input.role())) branch = branchCheck.requireActive(branch);
         if (users.findByUsername(input.username().trim()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
         }

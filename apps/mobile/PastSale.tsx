@@ -5,9 +5,9 @@ import type { Vehicle } from './api/inventory';
 import { PaymentMode, idTypes, inr, paymentModes, relations } from './api/billing';
 import { Salesperson, usersApi } from './api/users';
 import { PastPayment, pastSaleApi, previewTotals } from './api/pastSales';
+import { useBranches } from './api/branches';
 
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9', red = '#B42318';
-const branches = ['Varanasi', 'Ghazipur', 'Mau'];
 const money = /^(0|[1-9]\d{0,11})(\.\d{1,2})?$/;
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
 const todayIso = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -28,7 +28,9 @@ const blankPay = (): Pay => ({ amount: '', mode: 'UPI', reference: '', financeCo
 export default function PastSale({ user, stock, onDone, onCancel }: {
   user: CurrentUser; stock: Vehicle[]; onDone: (bookingId: number, message: string) => void; onCancel: () => void;
 }) {
-  const [branch, setBranch] = useState(user.branch || 'Varanasi');
+  const branches = useBranches();
+  const [branch, setBranch] = useState(user.branch || '');
+  useEffect(() => { if (!branch && branches.length) setBranch(branches[0]); }, [branches]);
   const [people, setPeople] = useState<Salesperson[]>([]);
   const [salesperson, setSalesperson] = useState(user.displayName);
   const [c, setC] = useState({ name: '', phone: '', relation: '', guardian: '', address: '', aadhaar: '', idType: '', idNumber: '', gstin: '', financier: '' });
@@ -102,7 +104,7 @@ export default function PastSale({ user, stock, onDone, onCancel }: {
   return <View style={s.card}>
     <Text style={s.title}>Record past sale</Text>
     <Text style={s.info}>For sales already made on a paper invoice. It keeps the paper invoice number and the real dates, so revenue and
-      payments count in the months they happened. Use test data until the app is ready for real customer records.</Text>
+      payments count in the months they happened.</Text>
     {!!error && <Text style={s.error}>{error}</Text>}
 
     {user.role === 'ADMIN' && <><Text style={s.label}>Branch</Text>

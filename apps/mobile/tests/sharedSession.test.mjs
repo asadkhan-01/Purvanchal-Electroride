@@ -44,9 +44,9 @@ test('sign-out removes authorization headers from subsequent requests', async ()
   }
 });
 
-test('invalid development credentials never replace an existing logged-in session', async () => {
+test('invalid credentials never replace an existing logged-in session', async () => {
   clearLoginCredentials();
-  assert.throws(() => setLoginCredentials('admin', 'nonascii-£'), /ASCII/);
+  assert.throws(() => setLoginCredentials('admin', 'nonascii-£'), /English letters, numbers and symbols/);
 });
 
 test('401 clears credentials and notifies the app session gate', async () => {

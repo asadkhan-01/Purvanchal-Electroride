@@ -27,6 +27,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BillingPersistenceIT {
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate testBranchesJdbc;
+
+    /** The seeded branches are the real ones; tests use their own test branches. */
+    @BeforeEach
+    void testBranches() {
+        for (String b : java.util.List.of("Varanasi", "Ghazipur"))
+            testBranchesJdbc.update("INSERT INTO branches (name, invoice_address) VALUES (?, ?) ON CONFLICT DO NOTHING", b, "Test address, " + b);
+    }
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
         .withDatabaseName("billing_it").withUsername("test").withPassword("test");
@@ -237,7 +246,7 @@ class BillingPersistenceIT {
         assertThat(body.get("idNumber")).isEqualTo("ABCDE1234F");
         assertThat(body.get("aadhaarLast4")).isEqualTo("1234");
         assertThat(body.get("dealerGstin")).isEqualTo("09TESTX0000X1Z0");
-        assertThat(body.get("dealerAddress")).isEqualTo("Test Road, Varanasi");
+        assertThat(body.get("dealerAddress")).as("branch invoice address").isEqualTo("Test address, Varanasi");
         assertThat(body.get("batterySerials").toString()).contains(", ");
         assertThat(body.get("chargerSerial").toString()).startsWith("C");
         assertThat(get("bill-sales", b + "/account").getBody().get("payable").toString()).isEqualTo("94750.0");
@@ -315,4 +324,27 @@ class BillingPersistenceIT {
         assertThat(post("bill-manager", "/api/v1/past-sales", pastSale("Varanasi", reservedChassis, paperNo + "9", inv, delivered, java.util.List.of(), false))
             .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void realBranchesAndAddressesAreSeededAndUnknownBranchesRefused() {
+        ResponseEntity<java.util.List> res = rest.exchange("http://localhost:" + port + "/api/v1/branches", HttpMethod.GET,
+            new HttpEntity<>(null, auth("bill-sales")), java.util.List.class);
+        java.util.List<Map> list = res.getBody();
+        assertThat(list).anySatisfy(b -> {
+            assertThat(b.get("name")).isEqualTo("Atraoli-Ghazipur");
+            assertThat(b.get("invoiceAddress")).isEqualTo("Atraoli (Maharana Pratap ke Bagal Me) Ghazipur");
+        });
+        assertThat(list).anySatisfy(b -> {
+            assertThat(b.get("name")).isEqualTo("Naini-Prayagraj");
+            assertThat(b.get("invoiceAddress")).isEqualTo("LIC Campus, Mewala Ki Bagiya Naini, Prayagraj");
+        });
+        assertThat(post("bill-admin", "/api/v1/inventory", Map.of("chassis", "NOBRANCH1", "model", "X", "variant", "Y", "branch", "Mau",
+            "motorSerial", "NB-M", "batterySerials", java.util.List.of("NB-B"), "chargerSerial", "NB-C", "controllerSerial", "NB-K"))
+            .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(post("bill-admin", "/api/v1/users", Map.of("username", "nobranch.user", "password", PW, "displayName", "No Branch",
+            "role", "SALESPERSON", "branch", "Mau")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    private HttpHeaders auth(String who) { HttpHeaders h = new HttpHeaders(); h.setBasicAuth(who, PW); return h; }
 }
