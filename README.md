@@ -60,7 +60,7 @@ npm ci
 npx expo start --web --host localhost
 ```
 
-Open the forwarded **8081** port in Codespaces. The web preview works in demo mode without backend configuration.
+Open the forwarded **8081** port in Codespaces. The app needs `EXPO_PUBLIC_API_URL` (see below); there is no offline demo mode.
 
 ### Single-port preview via same-origin proxy
 
@@ -101,9 +101,18 @@ When `EXPO_PUBLIC_API_URL` is configured, the app shows a shared sign-in screen 
 
 ### Optional API-backed CRM and Inventory
 
-The `LiveCRM.tsx` and `LiveInventory.tsx` screens call the real API when `apps/mobile/.env.local` contains `EXPO_PUBLIC_API_URL`. Without this configuration, `CRM.tsx` and `Inventory.tsx` continue to use in-memory demo data. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** with one app-wide sign-in screen for CRM and Inventory. The account's role and branch are obtained once from `/api/v1/auth/me`, retained in React state while the app is running, and passed to both modules. Credentials are held in memory only; sign-out or an HTTP 401 clears them and returns the app to sign-in. A page reload also requires signing in again. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
+All screens, including the dashboard, use the real API configured by `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.local`; the former in-memory demo screens and hardcoded dashboard figures have been removed. The Inventory screen supports vehicle registration, branch-scoped viewing, reservation, release, transfer initiation, destination receipt and movement history. Administrators and branch managers can mutate authorized stock; salespeople can only view it. This is an **opt-in development preview** with one app-wide sign-in screen for CRM and Inventory. The account's role and branch are obtained once from `/api/v1/auth/me`, retained in React state while the app is running, and passed to both modules. Credentials are held in memory only; sign-out or an HTTP 401 clears them and returns the app to sign-in. A page reload also requires signing in again. An initial admin account is bootstrapped once from the backend environment variables when no users exist. This is not a production authentication design.
 
 The Sales screen is API-connected as well, including an internal draft quotation view for pending bookings and manager approval. A salesperson can continue an enquiry into a booking using **Continue to booking**, or start a **Direct booking** from Sales without first creating an enquiry. Both paths allocate a specific available chassis and record customer details; managers confirm or cancel bookings. This is a booking/allocation workflow only, not a completed sale or invoice. See **[API setup, booking endpoints, and Codespaces CORS limitations](services/api/README.md)**. Keep the API port private. An authenticated Codespaces forwarding proxy may be required for the cross-origin web preview; do not expose the API publicly to bypass forwarding restrictions.
+
+## End-to-end flow check
+
+`scripts/flow-test.py` creates managers and salespeople in Varanasi and Ghazipur, registers vehicles, creates enquiries and walks the enquiry → booking → quotation → confirmation, cancellation and branch-transfer flows, checking each role restriction (57 checks). Use only against a test deployment:
+
+```bash
+BASE_URL=https://<your-service>.onrender.com ADMIN_PASSWORD='<admin password>' \
+TEST_PASSWORD='<12+ char password for created accounts>' python3 scripts/flow-test.py
+```
 
 ## Automated tests
 
@@ -138,7 +147,7 @@ GitHub Actions runs backend tests when backend files change and both TypeScript 
 5. **Implemented, verification pending — Persistent CRM:** API-backed enquiry list, creation, activity history, stage changes and follow-ups, with automated tests.
 6. **Implemented, verification pending — Development security:** database-backed users, admin provisioning, HTTP Basic login, enforced server-side CRM branch/salesperson visibility and automated role tests.
 7. **Backend CI verified — Inventory backend:** persistent chassis and component serials, reservation, branch transfer, receipt, movement history and server-side branch enforcement.
-8. **Implemented, new CI verification pending — Inventory UI integration:** API-connected inventory with role-aware controls and automated frontend rule tests; demo fallback remains.
+8. **Implemented, new CI verification pending — Inventory UI integration:** API-connected inventory with role-aware controls and automated frontend rule tests (offline demo screens since removed).
 9. **Implemented, CI pending — Shared development login:** a single Expo sign-in, shared role/branch identity, centralized logout and automatic reset on HTTP 401; mobile unit tests cover credential handling.
 10. **Implemented — Sales & Bookings foundation:** booking allocation, confirmation, cancellation, audit events and PostgreSQL uniqueness protection.
 11. **Implemented, new CI verification pending — Direct and enquiry-linked bookings:** Flyway V6 migration, direct customer capture without a dummy enquiry, CRM → Sales handoff, authenticated Sales UI, and unit/PostgreSQL tests.
