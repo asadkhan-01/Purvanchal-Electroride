@@ -7,7 +7,7 @@ import { allowedAction, canManageBranch, isRegistrationComplete } from './invent
 const branches = ['Varanasi', 'Ghazipur', 'Mau'];
 const blank: NewVehicle = {
   chassis: '', model: '', variant: '', colour: '', branch: 'Varanasi',
-  motorSerial: '', batterySerial: '', chargerSerial: '', controllerSerial: '',
+  motorSerial: '', batterySerials: [''], chargerSerial: '', controllerSerial: '',
 };
 const ink = '#18343D', teal = '#087D72', muted = '#657A83', border = '#DCE6E9';
 
@@ -59,7 +59,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
   const selected = vehicles.find(v => v.chassis === selectedChassis);
   const filtered = useMemo(() => vehicles.filter(v => {
     const matchesQuery = [v.chassis, v.model, v.variant, v.colour || '', v.motorSerial,
-      v.batterySerial, v.chargerSerial, v.controllerSerial].join(' ').toLowerCase().includes(query.toLowerCase());
+      ...v.batterySerials, v.chargerSerial, v.controllerSerial].join(' ').toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (branchFilter === 'All' || v.branch === branchFilter)
       && (statusFilter === 'All' || v.status === statusFilter);
   }), [vehicles, query, branchFilter, statusFilter]);
@@ -83,7 +83,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
 
   const register = async () => {
     if (!user || !canManageBranch(user, draft.branch)) { setError('Registration requires an authorized manager.'); return; }
-    if (!isRegistrationComplete(draft)) { setError('Provide chassis, model, variant and all four component serials.'); return; }
+    if (!isRegistrationComplete(draft)) { setError('Provide chassis, model, variant, motor, charger and controller serials, and at least one battery serial (no repeats).'); return; }
     const success = await perform(() => inventoryApi.register(draft), 'Vehicle registered in PostgreSQL');
     if (success) setDraft({ ...blank, branch: user.branch || 'Varanasi' });
   };
@@ -132,7 +132,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
     </View>
     {adding ? <View style={s.card}>
       <Text style={s.cardTitle}>Register incoming vehicle</Text>
-      <Field label="Chassis number *" value={draft.chassis} onChange={chassis => setDraft({ ...draft, chassis })} />
+      <Field label="Chassis / frame number *" value={draft.chassis} onChange={chassis => setDraft({ ...draft, chassis })} />
       <Field label="Model *" value={draft.model} onChange={model => setDraft({ ...draft, model })} />
       <Field label="Variant *" value={draft.variant} onChange={variant => setDraft({ ...draft, variant })} />
       <Field label="Colour" value={draft.colour || ''} onChange={colour => setDraft({ ...draft, colour })} />
@@ -140,7 +140,14 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
       <Options values={user.role === 'ADMIN' ? branches : [user.branch || 'Varanasi']}
         value={draft.branch} onSelect={branch => setDraft({ ...draft, branch })} />
       <Field label="Motor serial *" value={draft.motorSerial} onChange={motorSerial => setDraft({ ...draft, motorSerial })} />
-      <Field label="Battery serial *" value={draft.batterySerial} onChange={batterySerial => setDraft({ ...draft, batterySerial })} />
+      {draft.batterySerials.map((serial, i) => <View key={i}>
+        <Field label={draft.batterySerials.length > 1 ? `Battery ${i + 1} serial *` : 'Battery serial *'} value={serial}
+          onChange={value => setDraft({ ...draft, batterySerials: draft.batterySerials.map((b, j) => j === i ? value : b) })} />
+        {draft.batterySerials.length > 1 && <Pressable onPress={() => setDraft({ ...draft, batterySerials: draft.batterySerials.filter((_, j) => j !== i) })}>
+          <Text style={{ color: '#B42318', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>Remove battery {i + 1}</Text></Pressable>}
+      </View>)}
+      {draft.batterySerials.length < 6 && <Pressable onPress={() => setDraft({ ...draft, batterySerials: [...draft.batterySerials, ''] })}>
+        <Text style={{ color: '#087D72', fontSize: 12, fontWeight: '700', marginBottom: 10 }}>+ Add another battery</Text></Pressable>}
       <Field label="Charger serial *" value={draft.chargerSerial} onChange={chargerSerial => setDraft({ ...draft, chargerSerial })} />
       <Field label="Controller serial *" value={draft.controllerSerial} onChange={controllerSerial => setDraft({ ...draft, controllerSerial })} />
       <View style={s.actions}>
@@ -155,7 +162,7 @@ export default function LiveInventory({ user }: { user: CurrentUser }) {
       <Text style={s.detail}>Status: {selected.status.replace('_', ' ')}</Text>
       {!!selected.transferDestination && <Text style={s.detail}>Transfer destination: {selected.transferDestination}</Text>}
       <Text style={s.detail}>Motor: {selected.motorSerial}</Text>
-      <Text style={s.detail}>Battery: {selected.batterySerial}</Text>
+      <Text style={s.detail}>Batter{selected.batterySerials.length > 1 ? 'ies' : 'y'}: {selected.batterySerials.join(', ')}</Text>
       <Text style={s.detail}>Charger: {selected.chargerSerial}</Text>
       <Text style={s.detail}>Controller: {selected.controllerSerial}</Text>
       {selected.status === 'AVAILABLE' && canManageBranch(user, selected.branch) &&

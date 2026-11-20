@@ -13,10 +13,12 @@ export function canReceiveVehicle(user: Pick<CurrentUser, 'role' | 'branch'>,
 
 export function isRegistrationComplete(vehicle: {
   chassis: string; model: string; variant: string; branch: string;
-  motorSerial: string; batterySerial: string; chargerSerial: string; controllerSerial: string;
+  motorSerial: string; batterySerials: string[]; chargerSerial: string; controllerSerial: string;
 }): boolean {
+  const batteries = vehicle.batterySerials.map(b => b.trim().toUpperCase());
   return [vehicle.chassis, vehicle.model, vehicle.variant, vehicle.branch, vehicle.motorSerial,
-    vehicle.batterySerial, vehicle.chargerSerial, vehicle.controllerSerial].every(value => value.trim().length > 0);
+    vehicle.chargerSerial, vehicle.controllerSerial].every(value => value.trim().length > 0)
+    && batteries.length > 0 && batteries.every(b => b.length > 0) && new Set(batteries).size === batteries.length;
 }
 
 export function allowedAction(user: Pick<CurrentUser, 'role' | 'branch'>,

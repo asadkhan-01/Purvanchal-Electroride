@@ -59,6 +59,35 @@ class InventoryPersistenceIT {
     }
 
     @Test
+    void registersVehicleWithSeveralBatteries() {
+        HttpHeaders json = new HttpHeaders();
+        json.setContentType(MediaType.APPLICATION_JSON);
+        String body = """
+            {"chassis":"it-multi-1","model":"ZL Test","variant":"Dual","branch":"Varanasi",
+             "motorSerial":"it-m-multi-1","batterySerials":["it-bat-a","it-bat-b"],
+             "chargerSerial":"it-c-multi-1","controllerSerial":"it-k-multi-1"}
+            """;
+        ResponseEntity<Vehicle> created = as("inventory-varanasi").postForEntity(
+            "/api/v1/inventory", new HttpEntity<>(body, json), Vehicle.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody().batterySerials).containsExactly("IT-BAT-A", "IT-BAT-B");
+        Vehicle read = as("inventory-varanasi").getForObject("/api/v1/inventory/IT-MULTI-1", Vehicle.class);
+        assertThat(read.batterySerials).containsExactly("IT-BAT-A", "IT-BAT-B");
+
+        String reusedBattery = body.replace("it-multi-1", "it-multi-2").replace("it-m-multi-1", "it-m-multi-2")
+            .replace("it-c-multi-1", "it-c-multi-2").replace("it-k-multi-1", "it-k-multi-2").replace("it-bat-a", "it-bat-z");
+        assertThat(as("inventory-varanasi").postForEntity("/api/v1/inventory", new HttpEntity<>(reusedBattery, json), String.class)
+            .getStatusCode()).as("battery it-bat-b already fitted elsewhere").isEqualTo(HttpStatus.CONFLICT);
+
+        String sameTwice = reusedBattery.replace("\"it-bat-z\",\"it-bat-b\"", "\"it-bat-y\",\"IT-BAT-Y\"");
+        assertThat(as("inventory-varanasi").postForEntity("/api/v1/inventory", new HttpEntity<>(sameTwice, json), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        String none = reusedBattery.replace("[\"it-bat-z\",\"it-bat-b\"]", "[]");
+        assertThat(as("inventory-varanasi").postForEntity("/api/v1/inventory", new HttpEntity<>(none, json), String.class)
+            .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void registersAndTransfersWithSeparateSourceAndDestination() {
         String chassis = "IT-CHASSIS-100";
         String payload = """

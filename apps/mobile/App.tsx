@@ -6,6 +6,7 @@ import LiveInventory from './LiveInventory';
 import LiveCRM from './LiveCRM';
 import { apiConfigured } from './api/enquiries';
 import LiveDashboard from './LiveDashboard';
+import LiveFinance from './LiveFinance';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -62,7 +63,7 @@ export default function App() {
             <View style={styles.avatar}><Text style={styles.avatarText}>{session ? session.displayName.slice(0, 2).toUpperCase() : 'PE'}</Text></View>
           </View>
           <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Test data only. Development sign-in is not production-ready. Finance is not built yet.</Text></View>
+            <View style={styles.demoNotice}><Text style={styles.demoText}>DEVELOPMENT PREVIEW · Test data only. Development sign-in is not production-ready.</Text></View>
             {!apiConfigured ? <View style={styles.placeholder}><Text style={styles.placeholderTitle}>API not configured</Text><Text style={styles.placeholderBody}>Set EXPO_PUBLIC_API_URL in apps/mobile/.env.local (see README) and restart Expo.</Text></View>
             : !session ? <SessionGate user={session} onSignIn={setSession} /> : <>
             {section === 'Overview' && <>
@@ -86,7 +87,7 @@ export default function App() {
             {section === 'Inventory' && <LiveInventory user={session} />}
             {section === 'Sales' && <LiveBookings user={session} enquiryId={bookingEnquiryId} onClearEnquiry={() => setBookingEnquiryId(null)} />}
             {section === 'Users' && session.role === 'ADMIN' && <AdminUsers />}
-            {section === 'Finance' && <View style={styles.placeholder}><Text style={styles.placeholderTitle}>Finance workspace</Text><Text style={styles.placeholderBody}>Payments, lender disbursements, deductions and bank reconciliation will appear here. No real financial data is connected.</Text></View>}
+            {section === 'Finance' && <LiveFinance user={session} wide={wide} onOpenSales={() => setSection('Sales')} />}
             </>}
             <Text style={styles.footer}>Purvanchal Electroride ERP · Development preview</Text>
           </ScrollView>

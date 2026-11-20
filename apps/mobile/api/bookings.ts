@@ -1,6 +1,6 @@
 import { request } from './enquiries';
 
-export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'DELIVERED' | 'CANCELLED';
 export type Booking = {
   id: number;
   enquiryId: number | null;
@@ -14,6 +14,8 @@ export type Booking = {
   confirmedBy: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
+  deliveredBy?: string | null;
+  deliveredAt?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };

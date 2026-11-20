@@ -10,7 +10,8 @@ export type Vehicle = {
   branch: string;
   status: VehicleStatus;
   motorSerial: string;
-  batterySerial: string;
+  /** One or more battery pack serials. */
+  batterySerials: string[];
   chargerSerial: string;
   controllerSerial: string;
   transferDestination: string | null;
@@ -27,7 +28,7 @@ export type VehicleMovement = {
   occurredAt: string | null;
 };
 export type NewVehicle = Pick<Vehicle, 'chassis' | 'model' | 'variant' | 'colour' | 'branch'
-  | 'motorSerial' | 'batterySerial' | 'chargerSerial' | 'controllerSerial'>;
+  | 'motorSerial' | 'batterySerials' | 'chargerSerial' | 'controllerSerial'>;
 
 const vehiclePath = (chassis: string) => '/api/v1/inventory/' + encodeURIComponent(chassis);
 export const inventoryApi = {

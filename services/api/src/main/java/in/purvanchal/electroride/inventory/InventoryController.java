@@ -40,7 +40,8 @@ public class InventoryController {
         @Size(max=80) String colour,
         @NotBlank @Size(max=100) String branch,
         @NotBlank @Size(max=120) String motorSerial,
-        @NotBlank @Size(max=120) String batterySerial,
+        @Size(max=6) List<@NotBlank @Size(max=120) String> batterySerials,
+        @Size(max=120) String batterySerial, // single-battery shorthand, kept for older clients
         @NotBlank @Size(max=120) String chargerSerial,
         @NotBlank @Size(max=120) String controllerSerial
     ) {}
@@ -82,7 +83,7 @@ public class InventoryController {
         vehicle.colour = body.colour() == null ? null : body.colour().trim();
         vehicle.branch = body.branch().trim();
         vehicle.motorSerial = normalize(body.motorSerial());
-        vehicle.batterySerial = normalize(body.batterySerial());
+        vehicle.batterySerials = batteries(body);
         vehicle.chargerSerial = normalize(body.chargerSerial());
         vehicle.controllerSerial = normalize(body.controllerSerial());
         try {
@@ -92,6 +93,16 @@ public class InventoryController {
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Chassis or component serial already registered");
         }
+    }
+
+    private static List<String> batteries(RegisterVehicle body) {
+        List<String> raw = body.batterySerials() != null && !body.batterySerials().isEmpty() ? body.batterySerials()
+            : body.batterySerial() != null && !body.batterySerial().isBlank() ? List.of(body.batterySerial()) : List.of();
+        if (raw.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one battery serial is required");
+        List<String> serials = raw.stream().map(InventoryController::normalize).toList();
+        if (serials.stream().distinct().count() != serials.size())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Battery serials must be different");
+        return new java.util.ArrayList<>(serials);
     }
 
     @PostMapping("/{chassis}/reserve")

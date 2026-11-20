@@ -1,5 +1,7 @@
 package in.purvanchal.electroride.booking;
 
+import in.purvanchal.electroride.billing.InvoiceRepository;
+import in.purvanchal.electroride.billing.PaymentReceiptRepository;
 import in.purvanchal.electroride.enquiry.Enquiry;
 import in.purvanchal.electroride.enquiry.EnquiryRepository;
 import in.purvanchal.electroride.inventory.InventoryPolicy;
@@ -27,15 +29,19 @@ public class BookingService {
     private final VehicleMovementRepository movements;
     private final EnquiryAccess enquiryAccess;
     private final InventoryPolicy inventoryPolicy;
+    private final InvoiceRepository invoices;
+    private final PaymentReceiptRepository receipts;
 
     public BookingService(BookingRepository bookings, BookingEventRepository events,
                           EnquiryRepository enquiries, VehicleRepository vehicles,
                           VehicleMovementRepository movements, EnquiryAccess enquiryAccess,
-                          InventoryPolicy inventoryPolicy) {
+                          InventoryPolicy inventoryPolicy, InvoiceRepository invoices,
+                          PaymentReceiptRepository receipts) {
         this.bookings = bookings; this.events = events;
         this.enquiries = enquiries; this.vehicles = vehicles;
         this.movements = movements; this.enquiryAccess = enquiryAccess;
         this.inventoryPolicy = inventoryPolicy;
+        this.invoices = invoices; this.receipts = receipts;
     }
 
     public List<Booking> list(AppUser actor) {
@@ -169,7 +175,11 @@ public class BookingService {
         requireAccess(actor, booking);
         inventoryPolicy.requireManager(actor, booking.branch);
         if (!LIVE.contains(booking.status))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Booking is already cancelled");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending or confirmed bookings can be cancelled");
+        if (invoices.existsByBookingId(id))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Invoiced bookings cannot be cancelled (credit notes are not supported yet)");
+        if (receipts.existsByBookingIdAndStatus(id, "RECEIVED"))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Void (refund) all payment receipts before cancelling");
         Vehicle vehicle = vehicles.lockByChassis(
             vehicles.findById(booking.vehicleId).orElseThrow(() -> missing()).chassis
         ).orElseThrow(() -> missing());

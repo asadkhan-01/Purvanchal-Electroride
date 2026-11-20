@@ -5,10 +5,11 @@ import { Vehicle, inventoryApi } from './api/inventory';
 import { Booking, BookingEvent, bookingApi } from './api/bookings';
 import { bookingPayload } from './bookingRules';
 import { BookingQuotation, quotationApi } from './api/quotations';
+import BookingBilling from './BookingBilling';
 
 type Props = { user: CurrentUser; enquiryId?: number | null; onClearEnquiry?: () => void };
 const ink = '#18343D', teal = '#087D72', muted = '#637780', border = '#DCE6E9';
-const moneylessNote = 'Quotations exclude tax; no GST invoice, final payable amount or payment processing yet';
+const salesNote = 'Quotation → confirmation → payments → GST invoice → delivery. GST treatment needs accountant review before real use'
 
 function Input({ label, value, change, hint }: {
   label: string; value: string; change: (value: string) => void; hint?: string;
@@ -39,6 +40,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   const [events, setEvents] = useState<BookingEvent[]>([]);
   const [reason, setReason] = useState('');
   const [quotation, setQuotation] = useState<BookingQuotation | null>(null);
+  const [inclusive, setInclusive] = useState('');
   const [quoteFields, setQuoteFields] = useState({
     vehiclePrice: '', discount: '0', accessories: '0', otherCharges: '0',
   });
@@ -155,7 +157,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
   };
 
   return <View style={s.root}>
-    <View style={s.banner}><Text style={s.bannerText}>DEVELOPMENT SALES · {moneylessNote}. Use synthetic customer details.</Text></View>
+    <View style={s.banner}><Text style={s.bannerText}>DEVELOPMENT SALES · {salesNote}. Use test customer details only.</Text></View>
     <Text style={s.heading}>Sales & Bookings</Text>
     <Text style={s.sub}>{user.displayName} · {user.role} · {user.branch || 'All branches'}</Text>
     <View style={s.actions}><Pressable onPress={() => void reload()} disabled={busy} style={s.secondary}>
@@ -171,7 +173,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
       <Text style={s.info}>Customer: {active.customerName} · {active.customerPhone}</Text>
       <Text style={s.info}>Source: {active.enquiryId == null ? 'Direct booking' : 'Enquiry #' + active.enquiryId}</Text>
       <Text style={s.info}>Branch: {active.branch} · Salesperson: {active.salesperson}</Text>
-      <Text style={s.info}>Vehicle ID: {active.vehicleId}</Text>
+      <Text style={s.info}>Vehicle: {vehicles.find(v => v.id === active.vehicleId)?.chassis ?? '#' + active.vehicleId}</Text>
       <Text style={s.title}>Quotation · tax-exclusive estimate</Text>
       {quotation ? <>
         <Text style={s.info}>Status: {quotation.status} · Created by {quotation.createdBy}</Text>
@@ -185,7 +187,11 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
             <Text style={s.primaryText}>Approve quotation</Text>
           </Pressable>}
       </> : active.status === 'PENDING' ? <>
-        <Text style={s.info}>Enter indicative amounts in INR. GST, insurance, registration, subsidy and final on-road total are NOT calculated here.</Text>
+        <Text style={s.info}>Enter amounts in INR before GST. GST is added on the invoice; insurance, registration and subsidy are not included.</Text>
+        <Input label="Price including 5% GST (optional helper)" value={inclusive}
+          change={value => { setInclusive(value); const n = Number(value);
+            if (/^\d+(\.\d{1,2})?$/.test(value.trim()) && n > 0) setQuoteFields(prev => ({ ...prev, vehiclePrice: (n / 1.05).toFixed(2) })); }}
+          hint="e.g. 50000 → vehicle price 47619.05" />
         <Input label="Vehicle price (₹) *" value={quoteFields.vehiclePrice}
           change={vehiclePrice => setQuoteFields(prev => ({ ...prev, vehiclePrice }))} />
         <Input label="Dealer discount (₹)" value={quoteFields.discount}
@@ -201,7 +207,12 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
       {active.status === 'PENDING' && managersOnly && <Pressable style={s.primary}
         disabled={busy} onPress={() => void perform(() => bookingApi.confirm(active.id), 'Booking confirmed')}>
         <Text style={s.primaryText}>Confirm booking</Text></Pressable>}
-      {active.status !== 'CANCELLED' && managersOnly && <>
+      <BookingBilling user={user} booking={active} onChanged={async message => {
+        const [newBookings, newVehicles] = await Promise.all([bookingApi.list(), inventoryApi.list()]);
+        setBookings(newBookings); setVehicles(newVehicles);
+        await readEvents(active.id); setNotice(message);
+      }} />
+      {(active.status === 'PENDING' || active.status === 'CONFIRMED') && managersOnly && <>
         <Input label="Cancellation reason *" value={reason} change={setReason}
           hint="Reason for releasing the vehicle" />
         <Pressable style={s.secondary} disabled={busy} onPress={() => {
@@ -240,7 +251,7 @@ export default function LiveBookings({ user, enquiryId, onClearEnquiry }: Props)
       <Text style={s.title}>Existing bookings</Text>
       {bookings.map(b => <Pressable key={b.id} style={s.card} onPress={() => viewBooking(b.id)}>
         <Text style={s.title}>#{b.id} · {b.customerName} · {b.status}</Text>
-        <Text style={s.info}>{b.branch} · {b.enquiryId ? 'Enquiry #' + b.enquiryId : 'Direct'}</Text>
+        <Text style={s.info}>{b.branch} · {b.salesperson} · {b.enquiryId ? 'Enquiry #' + b.enquiryId : 'Direct'}</Text>
         <Text style={s.link}>View booking →</Text>
       </Pressable>)}
       {!bookings.length && <Text style={s.sub}>No bookings found.</Text>}
